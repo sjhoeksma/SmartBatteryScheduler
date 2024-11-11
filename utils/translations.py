@@ -30,6 +30,22 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Power Flow",
         nl="Energiestroom"
     ),
+    "power_flow_status": Translation(
+        en="Power Flow Status",
+        nl="Energiestroom Status"
+    ),
+    "energy_balance": Translation(
+        en="Energy Balance",
+        nl="Energiebalans"
+    ),
+    "surplus": Translation(
+        en="Surplus",
+        nl="Overschot"
+    ),
+    "deficit": Translation(
+        en="Deficit",
+        nl="Tekort"
+    ),
     
     # Power flow translations
     "power_flow_title": Translation(
