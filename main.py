@@ -11,6 +11,7 @@ from utils.price_data import get_day_ahead_prices
 from utils.historical_data import generate_historical_prices
 from utils.optimizer import optimize_schedule
 from utils.battery import Battery
+from utils.battery_profiles import BatteryProfileManager
 
 st.set_page_config(
     page_title="Energy Management Dashboard",
@@ -22,12 +23,17 @@ def main():
     st.title("⚡ Energy Management Dashboard")
     
     # Initialize session state
+    if 'profile_manager' not in st.session_state:
+        st.session_state.profile_manager = BatteryProfileManager()
+    
     if 'battery' not in st.session_state:
+        default_profile = st.session_state.profile_manager.get_profile("Home Battery")
         st.session_state.battery = Battery(
-            capacity=40.0,
-            min_soc=0.1,
-            max_soc=0.9,
-            charge_rate=7.4
+            capacity=default_profile.capacity,
+            min_soc=default_profile.min_soc,
+            max_soc=default_profile.max_soc,
+            charge_rate=default_profile.charge_rate,
+            profile_name="Home Battery"
         )
 
     # Layout
