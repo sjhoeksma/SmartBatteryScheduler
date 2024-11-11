@@ -12,6 +12,7 @@ from utils.historical_data import generate_historical_prices
 from utils.optimizer import optimize_schedule
 from utils.battery import Battery
 from utils.battery_profiles import BatteryProfileManager
+from utils.translations import get_text, add_language_selector
 
 st.set_page_config(
     page_title="Energy Management Dashboard",
@@ -20,7 +21,10 @@ st.set_page_config(
 )
 
 def main():
-    st.title("⚡ Energy Management Dashboard")
+    # Add language selector to sidebar
+    add_language_selector()
+    
+    st.title(get_text("app_title"))
     
     # Initialize session state
     if 'profile_manager' not in st.session_state:
@@ -41,7 +45,11 @@ def main():
         )
 
     # Layout
-    tab1, tab2, tab3 = st.tabs(["Real-time Dashboard", "Historical Analysis", "Cost Calculator"])
+    tab1, tab2, tab3 = st.tabs([
+        get_text("real_time_dashboard"),
+        get_text("historical_analysis"),
+        get_text("cost_calculator")
+    ])
     
     with tab1:
         col1, col2 = st.columns([2, 1])
@@ -56,14 +64,14 @@ def main():
             render_price_chart(prices, schedule, predicted_soc, consumption_stats)
 
         with col2:
-            st.subheader("Battery Configuration")
+            st.subheader(get_text("battery_config"))
             render_battery_config()
             
-            st.subheader("Battery Status")
+            st.subheader(get_text("battery_status"))
             render_battery_status(st.session_state.battery)
     
     with tab2:
-        st.subheader("Historical Price Analysis")
+        st.subheader(get_text("historical_analysis"))
         # Generate 30 days of historical data
         historical_prices = generate_historical_prices(days=30)
         render_historical_analysis(historical_prices, st.session_state.battery)
