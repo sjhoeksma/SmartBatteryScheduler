@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.price_data import is_prices_available_for_tomorrow
 
 def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_stats=None):
@@ -22,28 +22,9 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         yaxis="y2"
     ))
     
-    # Add home usage line with confidence intervals
+    # Add home usage line
     if 'battery' in st.session_state:
         battery = st.session_state.battery
-        
-        if consumption_stats is not None:
-            # Add confidence interval
-            fig.add_trace(go.Scatter(
-                x=consumption_stats['date'],
-                y=consumption_stats['upper_95'],
-                name="Upper 95% CI",
-                line=dict(color="rgba(0,0,0,0)"),
-                showlegend=False
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=consumption_stats['date'],
-                y=consumption_stats['lower_95'],
-                name="Confidence Interval",
-                fill='tonexty',
-                fillcolor='rgba(0,0,0,0.1)',
-                line=dict(color="rgba(0,0,0,0)")
-            ))
         
         # Add actual consumption line
         home_usage = [battery.get_hourly_consumption(h.hour, h) for h in prices.index]
