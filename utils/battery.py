@@ -18,12 +18,31 @@ class Battery:
             1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
             7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
         }
+        self._current_power = 0.0  # Initialize current power flow
     
     def get_available_capacity(self):
         return self.capacity * (self.max_soc - self.current_soc)
     
     def get_current_energy(self):
         return self.capacity * self.current_soc
+
+    def get_current_power(self):
+        """Get current power flow (positive for charging, negative for discharging)"""
+        hour = datetime.now().hour
+        consumption = self.get_hourly_consumption(hour)
+        
+        # Simulate charging/discharging based on time of day and SOC
+        if self.current_soc < 0.3:  # Low battery, prioritize charging
+            return min(self.charge_rate, self.get_available_capacity())
+        elif self.current_soc > 0.8:  # High battery, prioritize discharging
+            return -min(self.charge_rate, consumption)
+        else:  # Normal operation
+            if 0 <= hour < 6:  # Night charging
+                return min(self.charge_rate * 0.8, self.get_available_capacity())
+            elif 10 <= hour < 16:  # Day discharging
+                return -min(self.charge_rate * 0.6, consumption)
+            else:  # Mixed operation
+                return -min(self.charge_rate * 0.3, consumption)
     
     def can_charge(self, amount):
         return (self.current_soc + (amount / self.capacity)) <= self.max_soc
@@ -34,12 +53,14 @@ class Battery:
     def charge(self, amount):
         if self.can_charge(amount):
             self.current_soc += amount / self.capacity
+            self._current_power = amount
             return True
         return False
     
     def discharge(self, amount):
         if self.can_discharge(amount):
             self.current_soc -= amount / self.capacity
+            self._current_power = -amount
             return True
         return False
 

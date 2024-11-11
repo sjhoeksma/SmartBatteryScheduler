@@ -26,6 +26,32 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Cost Calculator",
         nl="Kostenberekening"
     ),
+    "power_flow": Translation(
+        en="Power Flow",
+        nl="Energiestroom"
+    ),
+    
+    # Power flow translations
+    "power_flow_title": Translation(
+        en="Real-time Power Flow",
+        nl="Real-time Energiestroom"
+    ),
+    "power_flow_visualization": Translation(
+        en="Power Flow Visualization",
+        nl="Energiestroom Visualisatie"
+    ),
+    "grid_power": Translation(
+        en="Grid Power",
+        nl="Netvermogen"
+    ),
+    "battery_power": Translation(
+        en="Battery Power",
+        nl="Batterijvermogen"
+    ),
+    "home_consumption": Translation(
+        en="Home Consumption",
+        nl="Thuisverbruik"
+    ),
     
     # Battery configuration translations
     "battery_config": Translation(
