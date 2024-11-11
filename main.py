@@ -6,6 +6,7 @@ from components.battery_config import render_battery_config
 from components.price_chart import render_price_chart
 from components.battery_status import render_battery_status
 from components.historical_analysis import render_historical_analysis
+from components.cost_calculator import render_cost_calculator
 from utils.price_data import get_day_ahead_prices
 from utils.historical_data import generate_historical_prices
 from utils.optimizer import optimize_schedule
@@ -30,7 +31,7 @@ def main():
         )
 
     # Layout
-    tab1, tab2 = st.tabs(["Real-time Dashboard", "Historical Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Real-time Dashboard", "Historical Analysis", "Cost Calculator"])
     
     with tab1:
         col1, col2 = st.columns([2, 1])
@@ -56,6 +57,11 @@ def main():
         # Generate 30 days of historical data
         historical_prices = generate_historical_prices(days=30)
         render_historical_analysis(historical_prices, st.session_state.battery)
+        
+    with tab3:
+        # Generate 30 days of historical data for cost calculations
+        historical_prices = generate_historical_prices(days=30)
+        render_cost_calculator(historical_prices, st.session_state.battery)
 
 if __name__ == "__main__":
     main()
