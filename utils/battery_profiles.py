@@ -9,6 +9,8 @@ class BatteryProfile:
     min_soc: float
     max_soc: float
     charge_rate: float
+    daily_consumption: float = 15.0  # Default daily consumption in kWh
+    usage_pattern: str = "Flat"  # Default usage pattern
 
 class BatteryProfileManager:
     def __init__(self):
@@ -23,21 +25,27 @@ class BatteryProfileManager:
                 capacity=13.5,
                 min_soc=0.1,
                 max_soc=0.9,
-                charge_rate=5.0
+                charge_rate=5.0,
+                daily_consumption=15.0,
+                usage_pattern="Day-heavy"
             ),
             "EV Battery": BatteryProfile(
                 name="EV Battery",
                 capacity=75.0,
                 min_soc=0.2,
                 max_soc=0.8,
-                charge_rate=11.0
+                charge_rate=11.0,
+                daily_consumption=20.0,
+                usage_pattern="Night-heavy"
             ),
             "Small Battery": BatteryProfile(
                 name="Small Battery",
                 capacity=5.0,
                 min_soc=0.15,
                 max_soc=0.85,
-                charge_rate=3.3
+                charge_rate=3.3,
+                daily_consumption=8.0,
+                usage_pattern="Flat"
             )
         }
         self.profiles.update(defaults)

@@ -23,22 +23,38 @@ def optimize_schedule(prices, battery):
     # Process periods sequentially
     for i in range(periods):
         current_price = prices.values[i] if isinstance(prices, pd.Series) else prices[i]
+        hour = prices.index[i].hour if isinstance(prices, pd.Series) else i % 24
+        
+        # Calculate home consumption for this hour
+        home_consumption = battery.get_hourly_consumption(hour)
         
         # Calculate available capacity and energy
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
         available_energy = battery.capacity * (current_soc - battery.min_soc)
         
-        # Decide action based on price and constraints
+        # First, handle home consumption
+        if available_energy >= home_consumption:
+            # Can supply home consumption from battery
+            schedule[i] = -home_consumption
+            current_soc -= home_consumption / battery.capacity
+        else:
+            # Need to charge to meet home consumption
+            needed_charge = home_consumption - available_energy
+            if battery.can_charge(needed_charge):
+                schedule[i] = needed_charge
+                current_soc += needed_charge / battery.capacity
+        
+        # Then optimize based on prices
         if current_price <= charge_threshold and available_capacity > 0:
             # Charge during low price periods
             charge_amount = min(battery.charge_rate, available_capacity)
-            schedule[i] = charge_amount
+            schedule[i] += charge_amount
             current_soc += charge_amount / battery.capacity
             
         elif current_price >= discharge_threshold and available_energy > 0:
             # Discharge during high price periods
             discharge_amount = min(battery.charge_rate, available_energy)
-            schedule[i] = -discharge_amount
+            schedule[i] -= discharge_amount
             current_soc -= discharge_amount / battery.capacity
             
         # Store predicted SOC for this period

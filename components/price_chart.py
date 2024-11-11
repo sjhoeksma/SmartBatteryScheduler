@@ -16,6 +16,17 @@ def render_price_chart(prices, schedule=None, predicted_soc=None):
         yaxis="y2"
     ))
     
+    # Add home usage line
+    if 'battery' in st.session_state:
+        battery = st.session_state.battery
+        home_usage = [battery.get_hourly_consumption(h.hour) for h in prices.index]
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=home_usage,
+            name="Home Usage",
+            line=dict(color="black", width=2, dash="dash")
+        ))
+    
     # Combined load strategy trace (primary y-axis)
     if schedule is not None:
         schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)

@@ -48,16 +48,33 @@ def render_battery_config():
             value=float(profile.charge_rate if profile else st.session_state.battery.charge_rate)
         )
         
+        # Add home usage settings
+        daily_consumption = st.number_input(
+            "Daily Consumption (kWh)",
+            min_value=1.0,
+            max_value=100.0,
+            value=float(profile.daily_consumption if profile else st.session_state.battery.daily_consumption)
+        )
+        
+        usage_pattern = st.selectbox(
+            "Usage Pattern",
+            ["Flat", "Day-heavy", "Night-heavy"],
+            index=["Flat", "Day-heavy", "Night-heavy"].index(
+                profile.usage_pattern if profile else st.session_state.battery.usage_pattern
+            )
+        )
+        
         if st.form_submit_button("Update Configuration"):
             # Update battery with new configuration
             st.session_state.battery = Battery(
                 capacity=capacity,
                 min_soc=min_soc,
                 max_soc=max_soc,
-                charge_rate=charge_rate
+                charge_rate=charge_rate,
+                profile_name=current_profile,
+                daily_consumption=daily_consumption,
+                usage_pattern=usage_pattern
             )
-            # Store profile name in battery instance
-            setattr(st.session_state.battery, 'profile_name', current_profile)
             st.success("Battery configuration updated!")
     
     # New profile creation
@@ -71,7 +88,9 @@ def render_battery_config():
                     capacity=st.session_state.battery.capacity,
                     min_soc=st.session_state.battery.min_soc,
                     max_soc=st.session_state.battery.max_soc,
-                    charge_rate=st.session_state.battery.charge_rate
+                    charge_rate=st.session_state.battery.charge_rate,
+                    daily_consumption=st.session_state.battery.daily_consumption,
+                    usage_pattern=st.session_state.battery.usage_pattern
                 )
                 st.session_state.profile_manager.add_profile(new_profile)
                 st.success(f"Created new profile: {new_name}")
