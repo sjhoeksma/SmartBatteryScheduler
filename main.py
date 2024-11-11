@@ -5,7 +5,9 @@ from datetime import datetime, timedelta
 from components.battery_config import render_battery_config
 from components.price_chart import render_price_chart
 from components.battery_status import render_battery_status
+from components.historical_analysis import render_historical_analysis
 from utils.price_data import get_day_ahead_prices
+from utils.historical_data import generate_historical_prices
 from utils.optimizer import optimize_schedule
 from utils.battery import Battery
 
@@ -28,23 +30,32 @@ def main():
         )
 
     # Layout
-    col1, col2 = st.columns([2, 1])
+    tab1, tab2 = st.tabs(["Real-time Dashboard", "Historical Analysis"])
     
-    with col1:
-        st.subheader("Energy Price and Charging Schedule")
-        prices = get_day_ahead_prices()
-        schedule = optimize_schedule(
-            prices,
-            st.session_state.battery
-        )
-        render_price_chart(prices, schedule)
-
-    with col2:
-        st.subheader("Battery Configuration")
-        render_battery_config()
+    with tab1:
+        col1, col2 = st.columns([2, 1])
         
-        st.subheader("Battery Status")
-        render_battery_status(st.session_state.battery)
+        with col1:
+            st.subheader("Energy Price and Charging Schedule")
+            prices = get_day_ahead_prices()
+            schedule = optimize_schedule(
+                prices,
+                st.session_state.battery
+            )
+            render_price_chart(prices, schedule)
+
+        with col2:
+            st.subheader("Battery Configuration")
+            render_battery_config()
+            
+            st.subheader("Battery Status")
+            render_battery_status(st.session_state.battery)
+    
+    with tab2:
+        st.subheader("Historical Price Analysis")
+        # Generate 30 days of historical data
+        historical_prices = generate_historical_prices(days=30)
+        render_historical_analysis(historical_prices, st.session_state.battery)
 
 if __name__ == "__main__":
     main()
