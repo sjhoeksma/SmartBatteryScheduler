@@ -22,6 +22,10 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Historical Analysis",
         nl="Historische Analyse"
     ),
+    "historical_price_trends": Translation(
+        en="Historical Price Trends",
+        nl="Historische Prijstrends"
+    ),
     "cost_calculator": Translation(
         en="Cost Calculator",
         nl="Kostenberekening"

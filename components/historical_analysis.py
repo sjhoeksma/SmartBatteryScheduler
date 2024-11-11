@@ -21,7 +21,7 @@ def render_historical_analysis(prices, battery):
     ])
     
     with tab1:
-        st.subheader("Historical Price Trends")
+        st.subheader(get_text("historical_price_trends"))
         
         # Create figure with secondary y-axis
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
