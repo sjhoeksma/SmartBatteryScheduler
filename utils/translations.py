@@ -136,6 +136,130 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Last updated",
         nl="Laatst bijgewerkt"
     ),
+
+    # Historical analysis translations
+    "price_trend": Translation(
+        en="Price Trend",
+        nl="Prijstrend"
+    ),
+    "peak_hours": Translation(
+        en="Peak Hours",
+        nl="Piekuren"
+    ),
+    "off_peak_hours": Translation(
+        en="Off-peak Hours",
+        nl="Daluren"
+    ),
+    "savings_opportunities": Translation(
+        en="Savings Opportunities",
+        nl="Besparingsmogelijkheden"
+    ),
+    "avg_daily_savings": Translation(
+        en="Average Daily Savings",
+        nl="Gemiddelde Dagelijkse Besparing"
+    ),
+    "per_day": Translation(
+        en="per day",
+        nl="per dag"
+    ),
+    "weekly_savings_pattern": Translation(
+        en="Weekly Savings Pattern",
+        nl="Wekelijks Besparingspatroon"
+    ),
+    "day_of_week": Translation(
+        en="Day of Week",
+        nl="Dag van de Week"
+    ),
+    "avg_potential_savings": Translation(
+        en="Average Potential Savings",
+        nl="Gemiddelde Potentiële Besparing"
+    ),
+    "optimization_recommendations": Translation(
+        en="Optimization Recommendations",
+        nl="Optimalisatie Aanbevelingen"
+    ),
+    "charge_below": Translation(
+        en="Charge when price is below {}",
+        nl="Opladen wanneer prijs onder {}"
+    ),
+    "discharge_above": Translation(
+        en="Discharge when price is above {}",
+        nl="Ontladen wanneer prijs boven {}"
+    ),
+    "best_charging_times": Translation(
+        en="Best charging times are typically during night hours",
+        nl="Beste oplaadtijden zijn meestal tijdens nachtelijke uren"
+    ),
+    "consider_weekly_patterns": Translation(
+        en="Consider weekly patterns for optimal scheduling",
+        nl="Houd rekening met wekelijkse patronen voor optimale planning"
+    ),
+
+    # Cost calculator translations
+    "cost_savings_calculator": Translation(
+        en="Cost Savings Calculator",
+        nl="Kostenbesparingsberekening"
+    ),
+    "daily_savings": Translation(
+        en="Daily Savings",
+        nl="Dagelijkse Besparing"
+    ),
+    "monthly_savings": Translation(
+        en="Monthly Savings",
+        nl="Maandelijkse Besparing"
+    ),
+    "roi_period": Translation(
+        en="ROI Period",
+        nl="Terugverdientijd"
+    ),
+    "investment": Translation(
+        en="investment",
+        nl="investering"
+    ),
+    "cycles": Translation(
+        en="cycles",
+        nl="cycli"
+    ),
+    "energy_shifted": Translation(
+        en="kWh shifted",
+        nl="kWh verschoven"
+    ),
+    "price_spread": Translation(
+        en="Price Spread (€/kWh)",
+        nl="Prijsverschil (€/kWh)"
+    ),
+    "cost_breakdown": Translation(
+        en="Cost Breakdown",
+        nl="Kostenverdeling"
+    ),
+    "peak_price": Translation(
+        en="Peak Price",
+        nl="Piekprijs"
+    ),
+    "off_peak_price": Translation(
+        en="Off-Peak Price",
+        nl="Dalprijs"
+    ),
+    "monthly_statistics": Translation(
+        en="Monthly Statistics",
+        nl="Maandelijkse Statistieken"
+    ),
+    "investment_analysis": Translation(
+        en="Investment Analysis",
+        nl="Investeringsanalyse"
+    ),
+    "annual_savings": Translation(
+        en="Annual Savings",
+        nl="Jaarlijkse Besparing"
+    ),
+    "return_on_investment": Translation(
+        en="Return on Investment",
+        nl="Rendement op Investering"
+    ),
+    "years": Translation(
+        en="years",
+        nl="jaren"
+    ),
 }
 
 def get_browser_language() -> str:
