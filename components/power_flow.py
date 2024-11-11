@@ -1,111 +1,108 @@
 import streamlit as st
-import plotly.graph_objects as go
+import streamlit.components.v1 as components
 from utils.translations import get_text
+from datetime import datetime
 import numpy as np
 
-def create_power_flow_sankey(battery, grid_power, home_consumption):
-    """Create a Sankey diagram showing power flow between grid, battery, and home"""
-    # Calculate power flows
-    battery_power = battery.get_current_power()  # Positive for charging, negative for discharging
+def create_power_flow_svg(battery, grid_power, home_consumption):
+    """Create SVG-based power flow visualization"""
+    battery_power = battery.get_current_power()
+    battery_percentage = (battery.current_soc - battery.min_soc) / (battery.max_soc - battery.min_soc) * 100
     
-    # Define node labels and colors
-    nodes = ["Grid", "Battery", "Home"]
-    node_colors = ["#3366cc", "#dc3912", "#ff9900"]
-    
-    # Initialize links
-    source = []
-    target = []
-    value = []
-    color = []
-    
-    # Grid to Battery flow (charging)
-    if battery_power > 0:
-        source.append(0)  # Grid
-        target.append(1)  # Battery
-        value.append(abs(battery_power))
-        color.append("#3366cc")
-    
-    # Battery to Home flow (discharging)
-    if battery_power < 0:
-        source.append(1)  # Battery
-        target.append(2)  # Home
-        value.append(abs(battery_power))
-        color.append("#dc3912")
-    
-    # Grid to Home flow (direct consumption)
-    grid_to_home = max(0, home_consumption - abs(min(0, battery_power)))
-    if grid_to_home > 0:
-        source.append(0)  # Grid
-        target.append(2)  # Home
-        value.append(grid_to_home)
-        color.append("#ff9900")
-    
-    # Create Sankey diagram
-    fig = go.Figure(data=[go.Sankey(
-        node=dict(
-            pad=15,
-            thickness=20,
-            line=dict(color="black", width=0.5),
-            label=nodes,
-            color=node_colors
-        ),
-        link=dict(
-            source=source,
-            target=target,
-            value=value,
-            color=color
-        )
-    )])
-    
-    fig.update_layout(
-        title=get_text("power_flow_title"),
-        font_size=12,
-        height=400
-    )
-    
-    return fig
-
-def render_power_flow_metrics(battery, grid_power, home_consumption):
-    """Render key metrics for power flow"""
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric(
-            get_text("grid_power"),
-            f"{grid_power:.2f} kW",
-            delta=f"{grid_power - home_consumption:.2f} kW"
-        )
-    
-    with col2:
-        battery_power = battery.get_current_power()
-        st.metric(
-            get_text("battery_power"),
-            f"{battery_power:.2f} kW",
-            delta_color="normal"
-        )
-    
-    with col3:
-        st.metric(
-            get_text("home_consumption"),
-            f"{home_consumption:.2f} kW",
-            delta=None
-        )
+    # Create HTML wrapper with SVG
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            @keyframes flowAnimation {{
+                0% {{ stroke-dashoffset: 20; }}
+                100% {{ stroke-dashoffset: 0; }}
+            }}
+            .flow-line {{
+                stroke-dasharray: 4 2;
+                animation: flowAnimation 1s linear infinite;
+            }}
+            .power-value {{
+                font-family: Arial;
+                font-size: 12px;
+                fill: #666;
+            }}
+            .icon-label {{
+                font-family: Arial;
+                font-size: 14px;
+                fill: #333;
+                text-anchor: middle;
+            }}
+        </style>
+    </head>
+    <body>
+        <svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+            <!-- Grid Icon -->
+            <g transform="translate(100,200)">
+                <rect x="-30" y="-30" width="60" height="60" fill="#3366cc" rx="5"/>
+                <path d="M-15,-15 L15,15 M-15,15 L15,-15" stroke="white" stroke-width="3"/>
+                <text class="icon-label" y="50">{get_text("grid_power")}</text>
+                <text class="power-value" y="70">{abs(grid_power):.1f} kW</text>
+            </g>
+            
+            <!-- Battery Icon -->
+            <g transform="translate(400,200)">
+                <rect x="-40" y="-60" width="80" height="120" fill="#dc3912" rx="5"/>
+                <rect x="-35" y="-55" width="70" height="{110 * (100 - battery_percentage) / 100}" fill="white"/>
+                <rect x="-15" y="-70" width="30" height="10" fill="#dc3912"/>
+                <text class="icon-label" y="50">{get_text("battery_power")}</text>
+                <text class="power-value" y="70">{abs(battery_power):.1f} kW</text>
+                <text class="power-value" y="90">{battery_percentage:.0f}%</text>
+            </g>
+            
+            <!-- House Icon -->
+            <g transform="translate(700,200)">
+                <path d="M-40,30 L0,-30 L40,30 Z" fill="#ff9900"/>
+                <rect x="-30" y="30" width="60" height="40" fill="#ff9900"/>
+                <rect x="-15" y="40" width="30" height="30" fill="white"/>
+                <text class="icon-label" y="50">{get_text("home_consumption")}</text>
+                <text class="power-value" y="70">{home_consumption:.1f} kW</text>
+            </g>
+            
+            <!-- Flow Lines -->
+            {
+            f'''
+            <path class="flow-line" d="M130,200 L360,200" stroke="#3366cc" stroke-width="3"/>
+            <path d="M340,195 L360,200 L340,205" fill="none" stroke="#3366cc" stroke-width="3"/>
+            <path class="flow-line" d="M130,200 C300,200 500,150 660,200" stroke="#ff9900" stroke-width="3"/>
+            <path d="M640,195 L660,200 L640,205" fill="none" stroke="#ff9900" stroke-width="3"/>
+            ''' if battery_power > 0 else f'''
+            <path class="flow-line" d="M440,200 L660,200" stroke="#dc3912" stroke-width="3"/>
+            <path d="M640,195 L660,200 L640,205" fill="none" stroke="#dc3912" stroke-width="3"/>
+            {
+            f"""
+            <path class="flow-line" d="M130,200 C300,200 500,150 660,200" stroke="#3366cc" stroke-width="3"/>
+            <path d="M640,195 L660,200 L640,205" fill="none" stroke="#3366cc" stroke-width="3"/>
+            """ if grid_power > 0 else ""
+            }
+            '''
+            }
+        </svg>
+    </body>
+    </html>
+    """
+    return html_content
 
 def render_power_flow(battery):
     """Main function to render power flow visualization"""
     st.subheader(get_text("power_flow_visualization"))
     
-    # Simulate some real-time values for demonstration
-    # In a real implementation, these would come from actual measurements
-    grid_power = np.sin(np.datetime64('now').astype(float) / 1e11) * 2 + 3  # Simulated grid power
-    home_consumption = abs(np.sin(np.datetime64('now').astype(float) / 1e11 + 1)) * 1.5 + 1  # Simulated consumption
+    # Create a container for the visualization
+    viz_container = st.empty()
     
-    # Create and display Sankey diagram
-    fig = create_power_flow_sankey(battery, grid_power, home_consumption)
-    st.plotly_chart(fig, use_container_width=True)
+    # Simulate real-time values for demonstration
+    grid_power = np.sin(datetime.now().timestamp() / 10) * 2 + 3
+    home_consumption = abs(np.sin(datetime.now().timestamp() / 10 + 1)) * 1.5 + 1
     
-    # Display metrics
-    render_power_flow_metrics(battery, grid_power, home_consumption)
+    # Create and display HTML visualization using components.html
+    html_content = create_power_flow_svg(battery, grid_power, home_consumption)
+    components.html(html_content, height=450)
     
-    # Add auto-refresh
-    st.empty()  # This will trigger a refresh of the component
+    # Add auto-refresh using empty placeholder
+    st.empty()
