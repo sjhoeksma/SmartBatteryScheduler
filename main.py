@@ -33,7 +33,11 @@ def main():
             min_soc=default_profile.min_soc,
             max_soc=default_profile.max_soc,
             charge_rate=default_profile.charge_rate,
-            profile_name="Home Battery"
+            profile_name="Home Battery",
+            daily_consumption=default_profile.daily_consumption,
+            usage_pattern=default_profile.usage_pattern,
+            yearly_consumption=default_profile.yearly_consumption,
+            monthly_distribution=default_profile.monthly_distribution
         )
 
     # Layout
@@ -45,11 +49,11 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             prices = get_day_ahead_prices()
-            schedule, predicted_soc = optimize_schedule(
+            schedule, predicted_soc, consumption_stats = optimize_schedule(
                 prices,
                 st.session_state.battery
             )
-            render_price_chart(prices, schedule, predicted_soc)
+            render_price_chart(prices, schedule, predicted_soc, consumption_stats)
 
         with col2:
             st.subheader("Battery Configuration")

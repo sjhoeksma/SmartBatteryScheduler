@@ -1,5 +1,20 @@
 import numpy as np
 import pandas as pd
+from datetime import datetime
+
+def analyze_consumption_patterns(battery, dates):
+    """Analyze consumption patterns and return statistical metrics"""
+    consumptions = []
+    for date in dates:
+        daily_consumption = battery.get_daily_consumption_for_date(date)
+        confidence = battery.get_consumption_confidence_intervals(date)
+        consumptions.append({
+            'date': date,
+            'consumption': daily_consumption,
+            'lower_95': confidence['lower_95'],
+            'upper_95': confidence['upper_95']
+        })
+    return pd.DataFrame(consumptions)
 
 def optimize_schedule(prices, battery):
     """
@@ -9,6 +24,7 @@ def optimize_schedule(prices, battery):
     periods = len(prices)
     schedule = np.zeros(periods)
     predicted_soc = np.zeros(periods)
+    consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
     # Calculate price thresholds for decision making
     median_price = np.median(prices)
@@ -23,10 +39,11 @@ def optimize_schedule(prices, battery):
     # Process periods sequentially
     for i in range(periods):
         current_price = prices.values[i] if isinstance(prices, pd.Series) else prices[i]
-        hour = prices.index[i].hour if isinstance(prices, pd.Series) else i % 24
+        current_date = prices.index[i] if isinstance(prices, pd.Series) else datetime.now()
+        hour = current_date.hour
         
-        # Calculate home consumption for this hour
-        home_consumption = battery.get_hourly_consumption(hour)
+        # Calculate home consumption for this hour with seasonal adjustment
+        home_consumption = battery.get_hourly_consumption(hour, current_date)
         
         # Calculate available capacity and energy
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
@@ -61,4 +78,4 @@ def optimize_schedule(prices, battery):
         if i < periods - 1:
             predicted_soc[i + 1] = current_soc
     
-    return schedule, predicted_soc
+    return schedule, predicted_soc, consumption_stats

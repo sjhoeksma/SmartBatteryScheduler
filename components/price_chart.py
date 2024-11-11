@@ -2,8 +2,9 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
-def render_price_chart(prices, schedule=None, predicted_soc=None):
+def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_stats=None):
     """Render interactive price chart with charging schedule and SOC prediction"""
     fig = go.Figure()
     
@@ -16,16 +17,47 @@ def render_price_chart(prices, schedule=None, predicted_soc=None):
         yaxis="y2"
     ))
     
-    # Add home usage line
+    # Add home usage line with confidence intervals
     if 'battery' in st.session_state:
         battery = st.session_state.battery
-        home_usage = [battery.get_hourly_consumption(h.hour) for h in prices.index]
+        
+        if consumption_stats is not None:
+            # Add confidence interval
+            fig.add_trace(go.Scatter(
+                x=consumption_stats['date'],
+                y=consumption_stats['upper_95'],
+                name="Upper 95% CI",
+                line=dict(color="rgba(0,0,0,0)"),
+                showlegend=False
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=consumption_stats['date'],
+                y=consumption_stats['lower_95'],
+                name="Confidence Interval",
+                fill='tonexty',
+                fillcolor='rgba(0,0,0,0.1)',
+                line=dict(color="rgba(0,0,0,0)")
+            ))
+        
+        # Add actual consumption line
+        home_usage = [battery.get_hourly_consumption(h.hour, h) for h in prices.index]
         fig.add_trace(go.Scatter(
             x=prices.index,
             y=home_usage,
             name="Home Usage",
             line=dict(color="black", width=2, dash="dash")
         ))
+        
+        # Add seasonal trend line
+        if len(prices.index) > 24:  # Only show trend for longer periods
+            trend_data = pd.Series(home_usage, index=prices.index).rolling(24).mean()
+            fig.add_trace(go.Scatter(
+                x=prices.index,
+                y=trend_data,
+                name="Usage Trend",
+                line=dict(color="red", width=1, dash="dot")
+            ))
     
     # Combined load strategy trace (primary y-axis)
     if schedule is not None:

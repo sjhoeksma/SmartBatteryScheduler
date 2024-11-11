@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, asdict
 from typing import Dict, Optional
+import numpy as np
 
 @dataclass
 class BatteryProfile:
@@ -11,6 +12,36 @@ class BatteryProfile:
     charge_rate: float
     daily_consumption: float = 15.0  # Default daily consumption in kWh
     usage_pattern: str = "Flat"  # Default usage pattern
+    yearly_consumption: float = 5475.0  # Default yearly consumption (15 kWh * 365)
+    monthly_distribution: Dict[int, float] = None  # Monthly consumption distribution factors
+    
+    def __post_init__(self):
+        if self.monthly_distribution is None:
+            # Initialize with default seasonal distribution
+            self.monthly_distribution = {
+                1: 1.2,  # Winter
+                2: 1.15,
+                3: 1.0,
+                4: 0.9,
+                5: 0.8,
+                6: 0.7,  # Summer
+                7: 0.7,
+                8: 0.7,
+                9: 0.8,
+                10: 0.9,
+                11: 1.0,
+                12: 1.15  # Winter
+            }
+
+    def get_seasonal_factor(self, month: int) -> float:
+        """Get seasonal adjustment factor for given month"""
+        return self.monthly_distribution.get(month, 1.0)
+
+    def get_daily_consumption_for_month(self, month: int) -> float:
+        """Calculate daily consumption for specific month considering seasonal patterns"""
+        yearly_daily_avg = self.yearly_consumption / 365.0
+        seasonal_factor = self.get_seasonal_factor(month)
+        return yearly_daily_avg * seasonal_factor
 
 class BatteryProfileManager:
     def __init__(self):
@@ -27,7 +58,8 @@ class BatteryProfileManager:
                 max_soc=0.9,
                 charge_rate=5.0,
                 daily_consumption=15.0,
-                usage_pattern="Day-heavy"
+                usage_pattern="Day-heavy",
+                yearly_consumption=5475.0
             ),
             "EV Battery": BatteryProfile(
                 name="EV Battery",
@@ -36,7 +68,8 @@ class BatteryProfileManager:
                 max_soc=0.8,
                 charge_rate=11.0,
                 daily_consumption=20.0,
-                usage_pattern="Night-heavy"
+                usage_pattern="Night-heavy",
+                yearly_consumption=7300.0
             ),
             "Small Battery": BatteryProfile(
                 name="Small Battery",
@@ -45,7 +78,8 @@ class BatteryProfileManager:
                 max_soc=0.85,
                 charge_rate=3.3,
                 daily_consumption=8.0,
-                usage_pattern="Flat"
+                usage_pattern="Flat",
+                yearly_consumption=2920.0
             )
         }
         self.profiles.update(defaults)
