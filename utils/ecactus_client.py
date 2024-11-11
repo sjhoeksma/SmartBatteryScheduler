@@ -1,5 +1,5 @@
 import os
-from ecactus_ecos_client import EcactusClient
+from utils.ecactus_stub import EcactusClient
 from typing import Dict, Optional
 from datetime import datetime
 
