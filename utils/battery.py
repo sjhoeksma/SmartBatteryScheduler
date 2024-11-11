@@ -5,7 +5,7 @@ class Battery:
         self.max_soc = max_soc
         self.charge_rate = charge_rate
         self.current_soc = 0.5  # Start at 50%
-        
+    
     def get_available_capacity(self):
         return self.capacity * (self.max_soc - self.current_soc)
     

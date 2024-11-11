@@ -8,3 +8,6 @@ primaryColor = "#0366d6"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f6f8fa"
 textColor = "#24292e"
+
+[browser]
+gatherUsageStats = false
