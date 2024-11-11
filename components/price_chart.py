@@ -3,9 +3,14 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 from datetime import datetime
+from utils.price_data import is_prices_available_for_tomorrow
 
 def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_stats=None):
     """Render interactive price chart with charging schedule and SOC prediction"""
+    # Add data availability notice
+    if not is_prices_available_for_tomorrow():
+        st.warning("⚠️ Day-ahead prices for tomorrow will be available after 13:00 CET")
+    
     fig = go.Figure()
     
     # Add price trace (secondary y-axis)
@@ -81,6 +86,25 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     # Calculate average price
     avg_price = prices.mean()
+    
+    # Add next update time annotation if before 13:00
+    if not is_prices_available_for_tomorrow():
+        next_update = datetime.now().replace(hour=13, minute=0, second=0, microsecond=0)
+        if next_update < datetime.now():
+            next_update = next_update + timedelta(days=1)
+        fig.add_annotation(
+            x=prices.index[-1],
+            y=avg_price,
+            xref="x",
+            yref="y2",
+            text=f"Next update at 13:00 CET",
+            showarrow=False,
+            xanchor="right",
+            yanchor="top",
+            xshift=-10,
+            yshift=20,
+            font=dict(color="red")
+        )
     
     # Update layout with triple y-axes
     fig.update_layout(
