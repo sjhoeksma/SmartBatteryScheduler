@@ -2,6 +2,8 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
+from utils.formatting import format_currency, format_percentage, format_number
+from utils.translations import get_text
 
 def render_historical_analysis(prices, battery):
     """Render historical price analysis charts and insights"""
@@ -44,7 +46,7 @@ def render_historical_analysis(prices, battery):
         st.plotly_chart(fig, use_container_width=True)
         
         # Display trend insights
-        st.info(f"📈 Price Trend: {analysis['trend_direction']}")
+        st.info(f"📈 {get_text('price_trend')}: {analysis['trend_direction']}")
     
     with tab2:
         st.subheader("Price Patterns")
@@ -73,18 +75,18 @@ def render_historical_analysis(prices, battery):
         # Display pattern insights
         col1, col2 = st.columns(2)
         with col1:
-            st.info(f"⚡ Peak Price Hours: {', '.join(f'{h:02d}:00' for h in analysis['peak_hours'])}")
+            st.info(f"⚡ {get_text('peak_hours')}: {', '.join(f'{h:02d}:00' for h in analysis['peak_hours'])}")
         with col2:
-            st.info(f"💡 Lowest Price Hours: {', '.join(f'{h:02d}:00' for h in analysis['off_peak_hours'])}")
+            st.info(f"💡 {get_text('off_peak_hours')}: {', '.join(f'{h:02d}:00' for h in analysis['off_peak_hours'])}")
     
     with tab3:
-        st.subheader("Savings Opportunities")
+        st.subheader(get_text("savings_opportunities"))
         
         # Display daily savings potential
         st.metric(
-            "Average Daily Savings Potential",
-            f"€{savings['daily_savings']:.2f}",
-            delta="per day"
+            get_text("avg_daily_savings"),
+            format_currency(savings['daily_savings']),
+            delta=get_text("per_day")
         )
         
         # Create weekly savings pattern chart
@@ -93,22 +95,22 @@ def render_historical_analysis(prices, battery):
         savings_fig.add_trace(go.Bar(
             x=days,
             y=savings['weekly_pattern'].values,
-            name="Weekly Savings Pattern",
+            name=get_text("weekly_savings_pattern"),
             marker_color="green"
         ))
         
         savings_fig.update_layout(
-            title="Weekly Savings Pattern",
-            xaxis_title="Day of Week",
-            yaxis_title="Average Potential Savings (€)"
+            title=get_text("weekly_savings_pattern"),
+            xaxis_title=get_text("day_of_week"),
+            yaxis_title=get_text("avg_potential_savings")
         )
         st.plotly_chart(savings_fig, use_container_width=True)
         
         # Display optimization recommendations
-        st.info("""
-        💰 **Optimization Recommendations:**
-        1. Charge when prices are below €{:.3f}/kWh
-        2. Discharge when prices are above €{:.3f}/kWh
-        3. Best charging times are typically during off-peak hours
-        4. Consider weekly patterns for optimal scheduling
-        """.format(savings['price_thresholds'][0.25], savings['price_thresholds'][0.75]))
+        st.info(f"""
+        💰 **{get_text('optimization_recommendations')}:**
+        1. {get_text('charge_below').format(format_currency(savings['price_thresholds'][0.25]))}
+        2. {get_text('discharge_above').format(format_currency(savings['price_thresholds'][0.75]))}
+        3. {get_text('best_charging_times')}
+        4. {get_text('consider_weekly_patterns')}
+        """)

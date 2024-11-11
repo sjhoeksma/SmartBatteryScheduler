@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from utils.translations import get_text
+from utils.formatting import format_percentage, format_number, format_date
 
 def render_battery_status(battery):
     """Render battery status indicators"""
@@ -13,24 +14,24 @@ def render_battery_status(battery):
         with col1:
             st.metric(
                 get_text("current_soc"),
-                f"{battery.current_soc*100:.1f}%",
-                delta=f"{(battery.current_soc-0.5)*100:.1f}%"
+                format_percentage(battery.current_soc * 100),
+                delta=format_percentage((battery.current_soc-0.5) * 100)
             )
             
             st.metric(
                 get_text("available_capacity"),
-                f"{battery.get_available_capacity():.1f} kWh"
+                f"{format_number(battery.get_available_capacity())} kWh"
             )
         
         with col2:
             st.metric(
                 get_text("current_energy"),
-                f"{battery.get_current_energy():.1f} kWh"
+                f"{format_number(battery.get_current_energy())} kWh"
             )
             
             st.metric(
                 get_text("charge_rate"),
-                f"{battery.charge_rate:.1f} kW"
+                f"{format_number(battery.charge_rate)} kW"
             )
         
         # Battery level visualization
@@ -45,4 +46,5 @@ def render_battery_status(battery):
         )
         
         # Last updated timestamp
-        st.markdown(f"*{get_text('last_updated')}: {datetime.now().strftime('%H:%M:%S')}*")
+        current_time = datetime.now()
+        st.markdown(f"*{get_text('last_updated')}: {format_date(current_time, include_time=True)}*")
