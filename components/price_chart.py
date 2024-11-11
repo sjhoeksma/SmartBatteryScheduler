@@ -20,35 +20,17 @@ def render_price_chart(prices, schedule=None):
         # Convert any NaN or very small values to exactly 0
         schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)
         
-        # Add charging trace (positive values)
-        charging_mask = schedule > 0
-        if charging_mask.any():
-            fig.add_trace(go.Scatter(
-                x=prices.index[charging_mask],
-                y=schedule[charging_mask],
-                name="Charging",
-                line=dict(color="green", width=2)
-            ))
-        
-        # Add discharging trace (negative values)
-        discharging_mask = schedule < 0
-        if discharging_mask.any():
-            fig.add_trace(go.Scatter(
-                x=prices.index[discharging_mask],
-                y=schedule[discharging_mask],
-                name="Discharging",
-                line=dict(color="red", width=2)
-            ))
-
-        # Add idle periods trace (zero values)
-        idle_mask = np.abs(schedule) < 1e-6
-        if idle_mask.any():
-            fig.add_trace(go.Scatter(
-                x=prices.index[idle_mask],
-                y=np.zeros(sum(idle_mask)),
-                name="Idle",
-                line=dict(color="gray", width=2)
-            ))
+        # Add battery power trace with color-coded segments
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=schedule,
+            name="Battery Power",
+            line=dict(
+                color=np.where(schedule > 0, "green",
+                       np.where(schedule < 0, "red", "gray")),
+                width=2
+            )
+        ))
     
     # Calculate average price
     avg_price = prices.mean()

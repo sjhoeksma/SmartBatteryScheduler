@@ -8,7 +8,7 @@ def get_day_ahead_prices():
     Returns hourly prices for the next 24 hours
     """
     now = datetime.now().replace(minute=0, second=0, microsecond=0)
-    dates = pd.date_range(start=now, periods=24, freq='H')
+    dates = pd.date_range(start=now, periods=24, freq='h')
     
     # Simulate realistic Dutch energy prices (€/kWh)
     base_price = 0.22
