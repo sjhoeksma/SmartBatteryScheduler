@@ -38,11 +38,11 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             prices = get_day_ahead_prices()
-            schedule = optimize_schedule(
+            schedule, predicted_soc = optimize_schedule(
                 prices,
                 st.session_state.battery
             )
-            render_price_chart(prices, schedule)
+            render_price_chart(prices, schedule, predicted_soc)
 
         with col2:
             st.subheader("Battery Configuration")

@@ -3,11 +3,11 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 
-def render_price_chart(prices, schedule=None):
-    """Render interactive price chart with charging schedule"""
+def render_price_chart(prices, schedule=None, predicted_soc=None):
+    """Render interactive price chart with charging schedule and SOC prediction"""
     fig = go.Figure()
     
-    # Add price trace
+    # Add price trace (secondary y-axis)
     fig.add_trace(go.Scatter(
         x=prices.index,
         y=prices.values,
@@ -16,52 +16,37 @@ def render_price_chart(prices, schedule=None):
         yaxis="y2"
     ))
     
+    # Combined load strategy trace (primary y-axis)
     if schedule is not None:
         schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)
-        
-        # Create masks for different states
-        charging_mask = schedule > 0
-        discharging_mask = schedule < 0
-        
-        # Add charging trace (positive values)
-        charging_values = np.where(charging_mask, schedule, None)
         fig.add_trace(go.Scatter(
             x=prices.index,
-            y=charging_values,
-            name="Charging",
-            line=dict(color="green", width=2)
+            y=schedule,
+            name="Load Strategy",
+            line=dict(color="purple", width=2)
         ))
-        
-        # Add discharging trace (negative values)
-        discharging_values = np.where(discharging_mask, schedule, None)
+    
+    # SOC prediction trace (third y-axis)
+    if predicted_soc is not None:
         fig.add_trace(go.Scatter(
             x=prices.index,
-            y=discharging_values,
-            name="Discharging",
-            line=dict(color="red", width=2)
-        ))
-        
-        # Add idle trace (zero values)
-        idle_mask = np.abs(schedule) < 1e-6
-        idle_values = np.where(idle_mask, 0, None)
-        fig.add_trace(go.Scatter(
-            x=prices.index,
-            y=idle_values,
-            name="Idle",
-            line=dict(color="gray", width=2)
+            y=predicted_soc * 100,  # Convert to percentage
+            name="Predicted SOC",
+            line=dict(color="orange", width=2, dash="dot"),
+            yaxis="y3"
         ))
     
     # Calculate average price
     avg_price = prices.mean()
     
-    # Update layout with dual y-axes
+    # Update layout with triple y-axes
     fig.update_layout(
         title="Energy Prices and Battery Schedule",
         xaxis_title="Time",
         yaxis=dict(
             title="Power (kW)",
-            titlefont=dict(color="black"),
-            tickfont=dict(color="black")
+            titlefont=dict(color="purple"),
+            tickfont=dict(color="purple")
         ),
         yaxis2=dict(
             title="Price (€/kWh)",
@@ -70,7 +55,17 @@ def render_price_chart(prices, schedule=None):
             anchor="free",
             overlaying="y",
             side="right",
-            position=0.95
+            position=0.85
+        ),
+        yaxis3=dict(
+            title="State of Charge (%)",
+            titlefont=dict(color="orange"),
+            tickfont=dict(color="orange"),
+            anchor="free",
+            overlaying="y",
+            side="right",
+            position=1.0,
+            range=[0, 100]
         ),
         shapes=[
             dict(

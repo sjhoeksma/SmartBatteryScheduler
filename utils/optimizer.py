@@ -4,10 +4,11 @@ import pandas as pd
 def optimize_schedule(prices, battery):
     """
     Optimize charging schedule based on prices and battery constraints
-    Returns charging power for each time period (positive for charging, negative for discharging)
+    Returns charging power for each time period and predicted SOC values
     """
     periods = len(prices)
     schedule = np.zeros(periods)
+    predicted_soc = np.zeros(periods)
     
     # Calculate price thresholds for decision making
     median_price = np.median(prices)
@@ -17,6 +18,7 @@ def optimize_schedule(prices, battery):
     
     # Track battery state through schedule
     current_soc = battery.current_soc
+    predicted_soc[0] = current_soc
     
     # Process periods sequentially
     for i in range(periods):
@@ -39,6 +41,8 @@ def optimize_schedule(prices, battery):
             schedule[i] = -discharge_amount
             current_soc -= discharge_amount / battery.capacity
             
-        # No action if price is in the neutral zone or battery constraints prevent action
+        # Store predicted SOC for this period
+        if i < periods - 1:
+            predicted_soc[i + 1] = current_soc
     
-    return schedule
+    return schedule, predicted_soc
