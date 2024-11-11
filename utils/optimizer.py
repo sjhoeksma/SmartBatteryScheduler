@@ -9,31 +9,36 @@ def optimize_schedule(prices, battery):
     periods = len(prices)
     schedule = np.zeros(periods)
     
-    # Find periods sorted by price
-    price_periods = list(enumerate(prices))
-    sorted_periods = sorted(price_periods, key=lambda x: x[1])
+    # Calculate price thresholds for decision making
+    median_price = np.median(prices)
+    price_std = np.std(prices)
+    charge_threshold = median_price - 0.5 * price_std
+    discharge_threshold = median_price + 0.5 * price_std
     
-    # Identify cheap and expensive periods
-    num_periods = len(sorted_periods)
-    cheap_periods = sorted_periods[:num_periods//3]  # Cheapest third
-    expensive_periods = sorted_periods[-num_periods//3:]  # Most expensive third
-    
+    # Track battery state through schedule
     current_soc = battery.current_soc
     
-    # Charge during cheap periods
-    for idx, price in cheap_periods:
+    # Process periods sequentially
+    for i in range(periods):
+        current_price = prices.values[i] if isinstance(prices, pd.Series) else prices[i]
+        
+        # Calculate available capacity and energy
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
-        if available_capacity > 0:
+        available_energy = battery.capacity * (current_soc - battery.min_soc)
+        
+        # Decide action based on price and constraints
+        if current_price <= charge_threshold and available_capacity > 0:
+            # Charge during low price periods
             charge_amount = min(battery.charge_rate, available_capacity)
-            schedule[idx] = charge_amount
+            schedule[i] = charge_amount
             current_soc += charge_amount / battery.capacity
-    
-    # Discharge during expensive periods
-    for idx, price in expensive_periods:
-        available_discharge = battery.capacity * (current_soc - battery.min_soc)
-        if available_discharge > 0:
-            discharge_amount = min(battery.charge_rate, available_discharge)
-            schedule[idx] = -discharge_amount  # Negative value for discharging
+            
+        elif current_price >= discharge_threshold and available_energy > 0:
+            # Discharge during high price periods
+            discharge_amount = min(battery.charge_rate, available_energy)
+            schedule[i] = -discharge_amount
             current_soc -= discharge_amount / battery.capacity
+            
+        # No action if price is in the neutral zone or battery constraints prevent action
     
     return schedule
