@@ -22,29 +22,38 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         yaxis="y2"
     ))
     
-    # Add home usage line
+    # Add home usage line with enhanced seasonal pattern visualization
     if 'battery' in st.session_state:
         battery = st.session_state.battery
         
+        # Calculate home usage with seasonal factors
+        home_usage = []
+        seasonal_trend = []
+        for date in prices.index:
+            hourly_usage = battery.get_hourly_consumption(date.hour, date)
+            home_usage.append(hourly_usage)
+            # Calculate seasonal baseline
+            seasonal_factor = battery.monthly_distribution[date.month]
+            baseline = battery.daily_consumption / 24.0 * seasonal_factor
+            seasonal_trend.append(baseline)
+        
         # Add actual consumption line
-        home_usage = [battery.get_hourly_consumption(h.hour, h) for h in prices.index]
         fig.add_trace(go.Scatter(
             x=prices.index,
             y=home_usage,
             name="Home Usage",
-            line=dict(color="black", width=2, dash="dash")
+            line=dict(color="black", width=2)
         ))
         
-        # Add seasonal trend line
-        if len(prices.index) > 24:  # Only show trend for longer periods
-            trend_data = pd.Series(home_usage, index=prices.index).rolling(24).mean()
-            fig.add_trace(go.Scatter(
-                x=prices.index,
-                y=trend_data,
-                name="Usage Trend",
-                line=dict(color="red", width=1, dash="dot")
-            ))
-    
+        # Add seasonal baseline
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=seasonal_trend,
+            name="Seasonal Baseline",
+            line=dict(color="red", width=2, dash="dot"),
+            opacity=0.7
+        ))
+
     # Combined load strategy trace (primary y-axis)
     if schedule is not None:
         schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)
@@ -89,7 +98,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     # Update layout with triple y-axes
     fig.update_layout(
-        title="Energy Prices and Battery Schedule",
+        title="Energy Prices and Usage Patterns",
         xaxis_title="Time",
         yaxis=dict(
             title="Power (kW)",
@@ -154,3 +163,11 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     )
     
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Add seasonal pattern explanation
+    st.info("""
+    📈 **Usage Pattern Information**
+    - The black line shows actual home usage including hourly variations
+    - The red dotted line shows the seasonal baseline consumption
+    - Seasonal factors adjust consumption based on the month (higher in winter, lower in summer)
+    """)

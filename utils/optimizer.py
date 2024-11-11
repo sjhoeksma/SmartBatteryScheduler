@@ -7,12 +7,9 @@ def analyze_consumption_patterns(battery, dates):
     consumptions = []
     for date in dates:
         daily_consumption = battery.get_daily_consumption_for_date(date)
-        confidence = battery.get_consumption_confidence_intervals(date)
         consumptions.append({
             'date': date,
-            'consumption': daily_consumption,
-            'lower_95': confidence['lower_95'],
-            'upper_95': confidence['upper_95']
+            'consumption': daily_consumption
         })
     return pd.DataFrame(consumptions)
 
