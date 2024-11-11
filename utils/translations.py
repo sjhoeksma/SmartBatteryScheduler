@@ -47,6 +47,46 @@ TRANSLATIONS: Dict[str, Translation] = {
         nl="Tekort"
     ),
     
+    # Historical Analysis tab titles
+    "price_trends_tab": Translation(
+        en="Price Trends",
+        nl="Prijstrends"
+    ),
+    "daily_patterns_tab": Translation(
+        en="Daily Patterns",
+        nl="Dagelijkse Patronen"
+    ),
+    "savings_analysis_tab": Translation(
+        en="Savings Analysis",
+        nl="Besparingsanalyse"
+    ),
+    
+    # Historical Analysis chart titles and labels
+    "price_trend_title": Translation(
+        en="Price Trend",
+        nl="Prijstrend"
+    ),
+    "price_volatility_title": Translation(
+        en="Price Volatility",
+        nl="Prijsvolatiliteit"
+    ),
+    "hourly_pattern_title": Translation(
+        en="Hourly Pattern",
+        nl="Uurlijks Patroon"
+    ),
+    "weekly_pattern_title": Translation(
+        en="Weekly Pattern",
+        nl="Wekelijks Patroon"
+    ),
+    "weekly_average_label": Translation(
+        en="Weekly Average",
+        nl="Wekelijks Gemiddelde"
+    ),
+    "hourly_average_label": Translation(
+        en="Hourly Average",
+        nl="Uurlijks Gemiddelde"
+    ),
+    
     # Power flow translations
     "power_flow_title": Translation(
         en="Real-time Power Flow",

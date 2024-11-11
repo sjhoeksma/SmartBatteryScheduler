@@ -14,31 +14,36 @@ def render_historical_analysis(prices, battery):
     savings = calculate_savings_opportunity(prices, battery)
     
     # Create tabs for different analyses
-    tab1, tab2, tab3 = st.tabs(["Price Trends", "Daily Patterns", "Savings Analysis"])
+    tab1, tab2, tab3 = st.tabs([
+        get_text("price_trends_tab"),
+        get_text("daily_patterns_tab"),
+        get_text("savings_analysis_tab")
+    ])
     
     with tab1:
         st.subheader("Historical Price Trends")
         
         # Create figure with secondary y-axis
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                           subplot_titles=("Price Trend", "Price Volatility"))
+                           subplot_titles=(get_text("price_trend_title"),
+                                         get_text("price_volatility_title")))
         
         # Add price trend with rolling average
         fig.add_trace(
             go.Scatter(x=analysis['daily_avg'].index, y=analysis['daily_avg'].values,
-                      name="Daily Average", line=dict(color="blue")),
+                      name=get_text("daily_savings"), line=dict(color="blue")),
             row=1, col=1
         )
         fig.add_trace(
             go.Scatter(x=analysis['rolling_mean'].index, y=analysis['rolling_mean'].values,
-                      name="7-Day Average", line=dict(color="red", dash="dash")),
+                      name=get_text("weekly_average_label"), line=dict(color="red", dash="dash")),
             row=1, col=1
         )
         
         # Add volatility
         fig.add_trace(
             go.Scatter(x=analysis['price_volatility'].index, y=analysis['price_volatility'].values,
-                      name="Daily Volatility", line=dict(color="orange")),
+                      name=get_text("price_volatility_title"), line=dict(color="orange")),
             row=2, col=1
         )
         
@@ -49,15 +54,17 @@ def render_historical_analysis(prices, battery):
         st.info(f"📈 {get_text('price_trend')}: {analysis['trend_direction']}")
     
     with tab2:
-        st.subheader("Price Patterns")
+        st.subheader(get_text("daily_patterns_tab"))
         
         # Create subplots for hourly and weekly patterns
-        pattern_fig = make_subplots(rows=1, cols=2, subplot_titles=("Hourly Pattern", "Weekly Pattern"))
+        pattern_fig = make_subplots(rows=1, cols=2, 
+                                  subplot_titles=(get_text("hourly_pattern_title"),
+                                                get_text("weekly_pattern_title")))
         
         # Hourly pattern
         pattern_fig.add_trace(
             go.Scatter(x=list(range(24)), y=analysis['hourly_avg'].values,
-                      name="Hourly Average", line=dict(color="green")),
+                      name=get_text("hourly_average_label"), line=dict(color="green")),
             row=1, col=1
         )
         
@@ -65,7 +72,7 @@ def render_historical_analysis(prices, battery):
         days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         pattern_fig.add_trace(
             go.Scatter(x=days, y=analysis['weekly_avg'].values,
-                      name="Weekly Average", line=dict(color="purple")),
+                      name=get_text("weekly_average_label"), line=dict(color="purple")),
             row=1, col=2
         )
         
