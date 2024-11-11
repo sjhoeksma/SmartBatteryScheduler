@@ -39,7 +39,7 @@ def render_power_flow(battery):
                 st.metric(
                     f"{get_text('grid_power')} {get_flow_direction(grid_power)}", 
                     f"{abs(grid_power):.1f} kW",
-                    delta=f"{'Supply' if grid_power > 0 else 'Return'}"
+                    delta=get_text("supply") if grid_power > 0 else get_text("return")
                 )
             
             # Battery metrics
@@ -47,7 +47,7 @@ def render_power_flow(battery):
                 st.metric(
                     f"{get_text('battery_power')} {get_flow_direction(battery_power)}", 
                     f"{abs(battery_power):.1f} kW",
-                    delta=f"{'Charging' if battery_power > 0 else 'Discharging'}"
+                    delta=get_text("charging") if battery_power > 0 else get_text("discharging")
                 )
                 # Add battery charge level
                 st.progress(
@@ -60,7 +60,7 @@ def render_power_flow(battery):
                 st.metric(
                     f"{get_text('home_consumption')} {get_flow_direction(-home_consumption)}", 
                     f"{home_consumption:.1f} kW",
-                    delta="Consuming"
+                    delta=get_text("consuming")
                 )
             
             # Display flow information
@@ -82,9 +82,9 @@ def render_power_flow(battery):
             
             # Show energy balance
             st.metric(
-                "Energy Balance",
+                get_text("energy_balance"),
                 f"{abs(net_flow):.1f} kW",
-                delta=f"{'Surplus' if net_flow > 0 else 'Deficit'}"
+                delta=get_text("surplus") if net_flow > 0 else get_text("deficit")
             )
 
     except Exception as e:

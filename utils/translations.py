@@ -304,6 +304,72 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="years",
         nl="jaren"
     ),
+
+    # New translations for battery profile
+    "battery_profile": Translation(
+        en="Battery Profile",
+        nl="Batterijprofiel"
+    ),
+    "create_new_profile": Translation(
+        en="Create New Profile",
+        nl="Nieuw Profiel Aanmaken"
+    ),
+    "profile_name": Translation(
+        en="Profile Name",
+        nl="Profielnaam"
+    ),
+    "profile_created": Translation(
+        en="Created new profile: {}",
+        nl="Nieuw profiel aangemaakt: {}"
+    ),
+    "provide_unique_name": Translation(
+        en="Please provide a unique profile name",
+        nl="Geef een unieke profielnaam op"
+    ),
+    "config_updated": Translation(
+        en="Battery configuration updated!",
+        nl="Batterijconfiguratie bijgewerkt!"
+    ),
+    "monthly_distribution_title": Translation(
+        en="Monthly Consumption Distribution",
+        nl="Maandelijkse Verbruiksverdeling"
+    ),
+    "month": Translation(
+        en="Month",
+        nl="Maand"
+    ),
+    "consumption_factor": Translation(
+        en="Consumption Factor",
+        nl="Verbruiksfactor"
+    ),
+    "consumption_help": Translation(
+        en="Will be adjusted based on seasonal patterns",
+        nl="Wordt aangepast op basis van seizoenspatronen"
+    ),
+    "total_yearly_consumption": Translation(
+        en="Total yearly energy consumption",
+        nl="Totaal jaarlijks energieverbruik"
+    ),
+    "charging": Translation(
+        en="Charging",
+        nl="Opladen"
+    ),
+    "discharging": Translation(
+        en="Discharging",
+        nl="Ontladen"
+    ),
+    "supply": Translation(
+        en="Supply",
+        nl="Levering"
+    ),
+    "return": Translation(
+        en="Return",
+        nl="Teruglevering"
+    ),
+    "consuming": Translation(
+        en="Consuming",
+        nl="Verbruikend"
+    ),
 }
 
 def get_browser_language() -> str:
