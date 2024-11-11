@@ -17,7 +17,8 @@ from utils.translations import get_text, add_language_selector
 st.set_page_config(
     page_title="Energy Management Dashboard",
     page_icon="⚡",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 def main():
