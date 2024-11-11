@@ -1,5 +1,6 @@
 import numpy as np
 from datetime import datetime
+from utils.ecactus_client import get_ecactus_client
 
 class Battery:
     def __init__(self, capacity, min_soc, max_soc, charge_rate, profile_name=None, 
@@ -18,50 +19,89 @@ class Battery:
             1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
             7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
         }
-        self._current_power = 0.0  # Initialize current power flow
+        self._current_power = 0.0
+        try:
+            self.ecactus_client = get_ecactus_client()
+        except ValueError:
+            self.ecactus_client = None
+    
+    def _update_from_api(self):
+        """Update battery status from Ecactus API"""
+        if self.ecactus_client:
+            status = self.ecactus_client.get_battery_status()
+            if status:
+                self.current_soc = status['current_soc']
+                self._current_power = status['current_power']
     
     def get_available_capacity(self):
+        self._update_from_api()
         return self.capacity * (self.max_soc - self.current_soc)
     
     def get_current_energy(self):
+        self._update_from_api()
         return self.capacity * self.current_soc
 
     def get_current_power(self):
         """Get current power flow (positive for charging, negative for discharging)"""
+        if self.ecactus_client:
+            status = self.ecactus_client.get_battery_status()
+            if status:
+                return status['current_power']
+        
+        # Fallback to simulated behavior
         hour = datetime.now().hour
         consumption = self.get_hourly_consumption(hour)
         
-        # Simulate charging/discharging based on time of day and SOC
-        if self.current_soc < 0.3:  # Low battery, prioritize charging
+        if self.current_soc < 0.3:
             return min(self.charge_rate, self.get_available_capacity())
-        elif self.current_soc > 0.8:  # High battery, prioritize discharging
+        elif self.current_soc > 0.8:
             return -min(self.charge_rate, consumption)
-        else:  # Normal operation
-            if 0 <= hour < 6:  # Night charging
+        else:
+            if 0 <= hour < 6:
                 return min(self.charge_rate * 0.8, self.get_available_capacity())
-            elif 10 <= hour < 16:  # Day discharging
+            elif 10 <= hour < 16:
                 return -min(self.charge_rate * 0.6, consumption)
-            else:  # Mixed operation
+            else:
                 return -min(self.charge_rate * 0.3, consumption)
     
     def can_charge(self, amount):
+        self._update_from_api()
         return (self.current_soc + (amount / self.capacity)) <= self.max_soc
     
     def can_discharge(self, amount):
+        self._update_from_api()
         return (self.current_soc - (amount / self.capacity)) >= self.min_soc
     
     def charge(self, amount):
         if self.can_charge(amount):
-            self.current_soc += amount / self.capacity
-            self._current_power = amount
-            return True
+            if self.ecactus_client:
+                success = self.ecactus_client.update_battery_settings({
+                    'charge_power': amount,
+                    'mode': 'charge'
+                })
+                if success:
+                    self._update_from_api()
+                    return True
+            else:
+                self.current_soc += amount / self.capacity
+                self._current_power = amount
+                return True
         return False
     
     def discharge(self, amount):
         if self.can_discharge(amount):
-            self.current_soc -= amount / self.capacity
-            self._current_power = -amount
-            return True
+            if self.ecactus_client:
+                success = self.ecactus_client.update_battery_settings({
+                    'discharge_power': amount,
+                    'mode': 'discharge'
+                })
+                if success:
+                    self._update_from_api()
+                    return True
+            else:
+                self.current_soc -= amount / self.capacity
+                self._current_power = -amount
+                return True
         return False
 
     def get_seasonal_factor(self, month):

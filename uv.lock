@@ -133,6 +133,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ecactus-ecos-client"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/ac/874f76172e196c0b0887e73f856385c0771e25d1fbe14cced9545ead0488/ecactus_ecos_client-0.1.4.tar.gz", hash = "sha256:0502010a34e54582e52eeaa009a1a45cd649b3214855e01311678e1af64c22fb", size = 8885 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/61/8894a8333bb83ee110c0cb091c416e9b501adfec413e5c76bf6509e2b130/ecactus_ecos_client-0.1.4-py3-none-any.whl", hash = "sha256:62a95c82d2001ee6daadf2435d609803b7d0660a7c2ec71acb1d436df6d016b4", size = 9812 },
+]
+
+[[package]]
 name = "gitdb"
 version = "4.0.11"
 source = { registry = "https://pypi.org/simple" }
@@ -561,6 +570,7 @@ name = "repl-nix-workspace"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "ecactus-ecos-client" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
@@ -571,6 +581,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ecactus-ecos-client", specifier = ">=0.1.4" },
     { name = "numpy", specifier = ">=2.1.3" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "plotly", specifier = ">=5.24.1" },

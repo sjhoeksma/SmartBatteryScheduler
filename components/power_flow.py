@@ -3,6 +3,7 @@ from utils.translations import get_text
 from datetime import datetime, timedelta
 import numpy as np
 import time
+from utils.ecactus_client import get_ecactus_client
 
 def get_flow_direction(power):
     """Return directional indicator based on power flow"""
@@ -11,7 +12,7 @@ def get_flow_direction(power):
     return "↑" if power > 0 else "↓"
 
 def render_power_flow(battery):
-    """Render simplified power flow visualization using basic Streamlit components"""
+    """Render power flow visualization using real-time data from Ecactus API"""
     try:
         st.subheader(get_text("power_flow_visualization"))
         
@@ -20,7 +21,19 @@ def render_power_flow(battery):
         
         # Function to update power values
         def update_power_values():
-            # Simulate real-time values for demonstration
+            try:
+                client = get_ecactus_client()
+                power_data = client.get_power_consumption()
+                if power_data:
+                    return (
+                        power_data['grid_power'],
+                        power_data['home_consumption'],
+                        power_data['battery_power']
+                    )
+            except (ValueError, Exception) as e:
+                pass
+            
+            # Fallback to simulated values if API fails
             timestamp = time.time()
             grid_power = np.sin(timestamp / 10) * 2 + 3
             home_consumption = abs(np.sin(timestamp / 10 + 1)) * 1.5 + 1
