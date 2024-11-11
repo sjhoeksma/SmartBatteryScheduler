@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd  # Added missing pandas import
 
 def render_price_chart(prices, schedule=None):
     """Render interactive price chart with charging schedule"""
@@ -16,31 +17,20 @@ def render_price_chart(prices, schedule=None):
     ))
     
     if schedule is not None:
-        # Split charging and discharging for different colors
-        charging_mask = schedule > 0
-        discharging_mask = schedule < 0
+        # Ensure schedule values are exactly 0 when no activity
+        schedule = np.where(pd.isna(schedule), 0, schedule)
         
-        # Add charging periods (green)
-        if any(charging_mask):
-            fig.add_trace(go.Scatter(
-                x=prices.index[charging_mask],
-                y=schedule[charging_mask],
-                name="Charging",
-                fill='tozeroy',
-                line=dict(color="green", width=0),
-                fillcolor='rgba(0, 255, 0, 0.3)'
-            ))
-        
-        # Add discharging periods (red)
-        if any(discharging_mask):
-            fig.add_trace(go.Scatter(
-                x=prices.index[discharging_mask],
-                y=schedule[discharging_mask],
-                name="Discharging",
-                fill='tozeroy',
-                line=dict(color="red", width=0),
-                fillcolor='rgba(255, 0, 0, 0.3)'
-            ))
+        # Add single trace for battery power (both charging and discharging)
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=schedule,
+            name="Battery Power",
+            line=dict(
+                color=["red" if val < 0 else "green" if val > 0 else "gray" for val in schedule],
+                width=2
+            ),
+            mode='lines'
+        ))
     
     # Calculate average price
     avg_price = prices.mean()
