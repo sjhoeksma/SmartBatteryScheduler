@@ -31,24 +31,13 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("Energy Price Overview")
+        st.subheader("Energy Price and Charging Schedule")
         prices = get_day_ahead_prices()
-        render_price_chart(prices)
-        
-        st.subheader("Charging Schedule")
         schedule = optimize_schedule(
             prices,
             st.session_state.battery
         )
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=prices.index,
-            y=schedule,
-            name="Charging Schedule",
-            fill='tozeroy'
-        ))
-        st.plotly_chart(fig, use_container_width=True)
+        render_price_chart(prices, schedule)
 
     with col2:
         st.subheader("Battery Configuration")
