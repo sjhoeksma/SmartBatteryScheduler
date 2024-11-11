@@ -7,7 +7,7 @@ def render_price_chart(prices, schedule=None):
     """Render interactive price chart with charging schedule"""
     fig = go.Figure()
     
-    # Add price trace on secondary y-axis
+    # Add price trace
     fig.add_trace(go.Scatter(
         x=prices.index,
         y=prices.values,
@@ -17,19 +17,38 @@ def render_price_chart(prices, schedule=None):
     ))
     
     if schedule is not None:
-        # Convert any NaN or very small values to exactly 0
         schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)
         
-        # Add battery power trace with color-coded segments
+        # Create masks for different states
+        charging_mask = schedule > 0
+        discharging_mask = schedule < 0
+        
+        # Add charging trace (positive values)
+        charging_values = np.where(charging_mask, schedule, None)
         fig.add_trace(go.Scatter(
             x=prices.index,
-            y=schedule,
-            name="Battery Power",
-            line=dict(
-                color=np.where(schedule > 0, "green",
-                       np.where(schedule < 0, "red", "gray")),
-                width=2
-            )
+            y=charging_values,
+            name="Charging",
+            line=dict(color="green", width=2)
+        ))
+        
+        # Add discharging trace (negative values)
+        discharging_values = np.where(discharging_mask, schedule, None)
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=discharging_values,
+            name="Discharging",
+            line=dict(color="red", width=2)
+        ))
+        
+        # Add idle trace (zero values)
+        idle_mask = np.abs(schedule) < 1e-6
+        idle_values = np.where(idle_mask, 0, None)
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=idle_values,
+            name="Idle",
+            line=dict(color="gray", width=2)
         ))
     
     # Calculate average price
