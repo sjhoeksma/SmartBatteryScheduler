@@ -17,8 +17,8 @@ def render_price_chart(prices, schedule=None):
     ))
     
     if schedule is not None:
-        # Ensure schedule values are exactly 0 when no activity
-        schedule = np.where(pd.isna(schedule), 0, schedule)
+        # Convert any NaN or very small values to exactly 0
+        schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)
         
         # Add charging trace (positive values)
         charging_mask = schedule > 0
@@ -38,6 +38,16 @@ def render_price_chart(prices, schedule=None):
                 y=schedule[discharging_mask],
                 name="Discharging",
                 line=dict(color="red", width=2)
+            ))
+
+        # Add idle periods trace (zero values)
+        idle_mask = np.abs(schedule) < 1e-6
+        if idle_mask.any():
+            fig.add_trace(go.Scatter(
+                x=prices.index[idle_mask],
+                y=np.zeros(sum(idle_mask)),
+                name="Idle",
+                line=dict(color="gray", width=2)
             ))
     
     # Calculate average price
