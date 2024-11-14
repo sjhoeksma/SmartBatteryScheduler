@@ -24,13 +24,12 @@ def get_day_ahead_prices(forecast_hours=24):
     if now >= publication_time:
         # After 13:00, we have tomorrow's prices
         start_date = current_hour
-        end_date = current_hour + timedelta(hours=forecast_hours)
     else:
         # Before 13:00, we only have today's remaining prices plus forecast
         start_date = current_hour
-        end_date = current_hour + timedelta(hours=forecast_hours)
     
-    dates = pd.date_range(start=start_date, end=end_date, freq='h', closed='left')
+    # Generate dates using periods instead of end_date
+    dates = pd.date_range(start=start_date, periods=forecast_hours, freq='h')
     
     # Simulate realistic Dutch energy prices (€/kWh)
     base_price = 0.22
@@ -40,10 +39,11 @@ def get_day_ahead_prices(forecast_hours=24):
     prices = []
     for date in dates:
         hour = date.hour
-        hours_ahead = (date - now).total_seconds() / 3600
+        hours_ahead = max(0, (date - now).total_seconds() / 3600)
         
         # Add increasing uncertainty for future hours with smoothed transitions
-        uncertainty_factor = 0.2 * (1 - np.exp(-hours_ahead / 24))
+        # Use sigmoid function to ensure smooth transition and positive values
+        uncertainty_factor = 0.2 / (1 + np.exp(-hours_ahead / 24))
         
         # Add weekly pattern
         weekly_factor = 1.0 + (0.05 if date.weekday() < 5 else -0.05)
@@ -61,8 +61,8 @@ def get_day_ahead_prices(forecast_hours=24):
             # Off-peak hours have lower prices
             price = base_price * weekly_factor * (1 + np.random.uniform(-0.3, 0.0) + daily_factor)
         
-        # Add smoothed uncertainty based on forecast distance
-        price *= (1 + np.random.normal(0, uncertainty_factor))
+        # Add smoothed uncertainty based on forecast distance using positive scale
+        price *= (1 + np.random.normal(0, max(0.001, uncertainty_factor)))
         prices.append(max(0.05, price))  # Ensure minimum price of 0.05 €/kWh
     
     return pd.Series(prices, index=dates)
@@ -79,7 +79,7 @@ def get_price_forecast_confidence(date):
     Returns a value between 0 and 1, where 1 is highest confidence.
     """
     now = datetime.now()
-    hours_ahead = (date - now).total_seconds() / 3600
+    hours_ahead = max(0, (date - now).total_seconds() / 3600)
     
     if hours_ahead <= 24 and is_prices_available_for_tomorrow():
         return 1.0  # Actual day-ahead prices
