@@ -106,7 +106,8 @@ def render_battery_config():
                 min_value=0.0,
                 max_value=0.5,
                 value=float(profile.surcharge_rate if profile else st.session_state.battery.surcharge_rate),
-                step=0.01,
+                step=0.001,
+                format="%.3f",
                 help="Additional cost applied to energy prices"
             )
         
@@ -127,7 +128,7 @@ def render_battery_config():
                 usage_pattern=usage_pattern,
                 yearly_consumption=yearly_consumption,
                 monthly_distribution=profile.monthly_distribution if profile else None,
-                surcharge_rate=surcharge_rate
+                surcharge_rate=round(surcharge_rate, 3)
             )
             st.success(get_text("config_updated"))
     
@@ -147,7 +148,7 @@ def render_battery_config():
                     usage_pattern=st.session_state.battery.usage_pattern,
                     yearly_consumption=st.session_state.battery.yearly_consumption,
                     monthly_distribution=st.session_state.battery.monthly_distribution,
-                    surcharge_rate=st.session_state.battery.surcharge_rate
+                    surcharge_rate=round(st.session_state.battery.surcharge_rate, 3)
                 )
                 st.session_state.profile_manager.add_profile(new_profile)
                 st.success(get_text("profile_created").format(new_name))
