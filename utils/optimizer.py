@@ -31,8 +31,8 @@ def optimize_schedule(prices, battery):
     ])
     median_price = np.median(effective_prices)
     price_std = np.std(effective_prices)
-    charge_threshold = median_price - 0.5 * price_std
-    discharge_threshold = median_price + 0.5 * price_std
+    charge_threshold = median_price - 0.25 * price_std  # Changed from 0.5 to 0.25
+    discharge_threshold = median_price + 0.25 * price_std  # Changed from 0.5 to 0.25
     
     # Start with current battery SOC
     current_soc = battery.current_soc
@@ -55,10 +55,13 @@ def optimize_schedule(prices, battery):
             charge_events = 0
             discharge_events = 0
             daily_cycles = 0.0
-        last_date = current_datetime.date()
+            last_date = current_datetime.date()
         
         # Calculate home consumption for this hour with seasonal adjustment
         home_consumption = battery.get_hourly_consumption(hour, current_datetime)
+        
+        # Calculate remaining cycles at the start of each period
+        remaining_cycles = battery.max_daily_cycles - daily_cycles
         
         # Handle home consumption with proper min_soc check
         if current_soc <= battery.min_soc:
@@ -85,11 +88,10 @@ def optimize_schedule(prices, battery):
                 available_discharge = (current_soc - battery.min_soc) * battery.capacity
                 schedule[i] = -available_discharge
                 consumption_change = available_discharge / battery.capacity
-
+        
         # Then optimize based on prices if we haven't exceeded event limits
-        remaining_cycles = battery.max_daily_cycles - daily_cycles
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
-
+        
         if remaining_cycles > 0 and available_capacity > 0:
             if current_price <= charge_threshold and charge_events < battery.max_charge_events:
                 # Charge during low price periods
