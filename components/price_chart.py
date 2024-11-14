@@ -94,11 +94,14 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     # SOC prediction trace (top layer)
     if predicted_soc is not None:
+        # Align SOC predictions with hour starts
+        soc_times = prices.index
+        
         fig.add_trace(go.Scatter(
-            x=prices.index,
+            x=soc_times,
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
-            line=dict(color="rgba(155, 89, 182, 0.9)", width=3),  # Updated to purple with higher width
+            line=dict(color="rgba(155, 89, 182, 0.9)", width=3),  # Purple with higher width
             mode='lines',
             yaxis="y3",
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
@@ -139,8 +142,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         ),
         yaxis3=dict(
             title="State of Charge (%)",
-            titlefont=dict(color="rgba(155, 89, 182, 1.0)"),  # Updated to match line color
-            tickfont=dict(color="rgba(155, 89, 182, 1.0)"),  # Updated to match line color
+            titlefont=dict(color="rgba(155, 89, 182, 1.0)"),
+            tickfont=dict(color="rgba(155, 89, 182, 1.0)"),
             anchor="free",
             overlaying="y",
             side="right",
