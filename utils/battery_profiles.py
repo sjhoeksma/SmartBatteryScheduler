@@ -14,6 +14,8 @@ class BatteryProfile:
     usage_pattern: str = "Flat"  # Default usage pattern
     yearly_consumption: float = 5475.0  # Default yearly consumption (15 kWh * 365)
     monthly_distribution: Dict[int, float] = None  # Monthly consumption distribution factors
+    surcharge_rate: float = 0.05  # Default surcharge rate in €/kWh
+    surcharge_hours: Dict[int, bool] = None  # Hours when surcharge applies
     
     def __post_init__(self):
         if self.monthly_distribution is None:
@@ -32,6 +34,12 @@ class BatteryProfile:
                 11: 1.0,
                 12: 1.15  # Winter
             }
+        if self.surcharge_hours is None:
+            # Initialize with default surcharge hours (peak hours)
+            self.surcharge_hours = {
+                hour: hour in [7, 8, 9, 17, 18, 19, 20]
+                for hour in range(24)
+            }
 
     def get_seasonal_factor(self, month: int) -> float:
         """Get seasonal adjustment factor for given month"""
@@ -42,6 +50,10 @@ class BatteryProfile:
         yearly_daily_avg = self.yearly_consumption / 365.0
         seasonal_factor = self.get_seasonal_factor(month)
         return yearly_daily_avg * seasonal_factor
+
+    def is_surcharge_hour(self, hour: int) -> bool:
+        """Check if surcharge applies for given hour"""
+        return self.surcharge_hours.get(hour, False)
 
 class BatteryProfileManager:
     def __init__(self):
@@ -59,7 +71,8 @@ class BatteryProfileManager:
                 charge_rate=5.0,
                 daily_consumption=15.0,
                 usage_pattern="Day-heavy",
-                yearly_consumption=5475.0
+                yearly_consumption=5475.0,
+                surcharge_rate=0.05
             ),
             "EV Battery": BatteryProfile(
                 name="EV Battery",
@@ -69,7 +82,8 @@ class BatteryProfileManager:
                 charge_rate=11.0,
                 daily_consumption=20.0,
                 usage_pattern="Night-heavy",
-                yearly_consumption=7300.0
+                yearly_consumption=7300.0,
+                surcharge_rate=0.08
             ),
             "Small Battery": BatteryProfile(
                 name="Small Battery",
@@ -79,7 +93,8 @@ class BatteryProfileManager:
                 charge_rate=3.3,
                 daily_consumption=8.0,
                 usage_pattern="Flat",
-                yearly_consumption=2920.0
+                yearly_consumption=2920.0,
+                surcharge_rate=0.05
             )
         }
         self.profiles.update(defaults)

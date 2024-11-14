@@ -5,7 +5,7 @@ from utils.ecactus_client import get_ecactus_client
 class Battery:
     def __init__(self, capacity, min_soc, max_soc, charge_rate, profile_name=None, 
                  daily_consumption=15.0, usage_pattern="Flat", yearly_consumption=5475.0,
-                 monthly_distribution=None):
+                 monthly_distribution=None, surcharge_rate=0.05, surcharge_hours=None):
         self.capacity = capacity
         self.min_soc = min_soc
         self.max_soc = max_soc
@@ -18,6 +18,11 @@ class Battery:
         self.monthly_distribution = monthly_distribution or {
             1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
             7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
+        }
+        self.surcharge_rate = surcharge_rate
+        self.surcharge_hours = surcharge_hours or {
+            hour: hour in [7, 8, 9, 17, 18, 19, 20]
+            for hour in range(24)
         }
         self._current_power = 0.0
         try:
@@ -165,3 +170,9 @@ class Battery:
             'lower_95': base_consumption - (1.96 * std_dev),
             'upper_95': base_consumption + (1.96 * std_dev)
         }
+
+    def get_effective_price(self, base_price: float, hour: int) -> float:
+        """Calculate effective price including surcharge if applicable"""
+        if self.surcharge_hours.get(hour, False):
+            return base_price + self.surcharge_rate
+        return base_price

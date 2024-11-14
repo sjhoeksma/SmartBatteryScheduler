@@ -24,8 +24,12 @@ def optimize_schedule(prices, battery):
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
     # Calculate price thresholds for decision making
-    median_price = np.median(prices)
-    price_std = np.std(prices)
+    effective_prices = pd.Series([
+        battery.get_effective_price(price, date.hour)
+        for price, date in zip(prices.values, prices.index)
+    ])
+    median_price = np.median(effective_prices)
+    price_std = np.std(effective_prices)
     charge_threshold = median_price - 0.5 * price_std
     discharge_threshold = median_price + 0.5 * price_std
     
@@ -35,12 +39,12 @@ def optimize_schedule(prices, battery):
     
     # Process periods sequentially
     for i in range(periods):
-        current_price = prices.values[i] if isinstance(prices, pd.Series) else prices[i]
-        current_date = prices.index[i] if isinstance(prices, pd.Series) else datetime.now()
-        hour = current_date.hour
+        current_price = effective_prices.iloc[i]
+        current_datetime = prices.index[i]
+        hour = current_datetime.hour if isinstance(current_datetime, pd.Timestamp) else datetime.now().hour
         
         # Calculate home consumption for this hour with seasonal adjustment
-        home_consumption = battery.get_hourly_consumption(hour, current_date)
+        home_consumption = battery.get_hourly_consumption(hour, current_datetime)
         
         # Calculate available capacity and energy
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
