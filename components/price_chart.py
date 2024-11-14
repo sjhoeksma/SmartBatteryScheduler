@@ -94,9 +94,13 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     # SOC prediction trace (top layer)
     if predicted_soc is not None:
-        # Use the same timestamps as prices for SOC predictions
+        # Create extended timestamps for step-aligned SOC visualization
+        timestamps = list(prices.index)
+        if len(timestamps) > 0:
+            timestamps.append(timestamps[-1] + pd.Timedelta(hours=1))
+        
         fig.add_trace(go.Scatter(
-            x=prices.index,
+            x=timestamps,
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
             line=dict(
@@ -186,4 +190,5 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     - Light blue bars indicate charging periods (buying energy)
     - Dark blue bars indicate discharging periods (using stored energy)
     - Energy prices are shown as hourly blocks with reduced opacity to highlight charging patterns
+    - Purple line shows predicted battery State of Charge (SOC) aligned to hour boundaries
     """)

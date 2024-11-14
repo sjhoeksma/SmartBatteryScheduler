@@ -20,8 +20,7 @@ def optimize_schedule(prices, battery):
     """
     periods = len(prices)
     schedule = np.zeros(periods)
-    # Initialize SOC array with the same length as prices
-    predicted_soc = np.zeros(periods)
+    predicted_soc = np.zeros(periods + 1)  # Add extra point for proper step visualization
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
     # Calculate price thresholds for decision making
@@ -47,7 +46,7 @@ def optimize_schedule(prices, battery):
         # Calculate home consumption for this hour with seasonal adjustment
         home_consumption = battery.get_hourly_consumption(hour, current_datetime)
         
-        # Calculate available capacity and energy
+        # Calculate available capacity and energy at period start
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
         available_energy = battery.capacity * (current_soc - battery.min_soc)
         
@@ -75,8 +74,8 @@ def optimize_schedule(prices, battery):
             discharge_amount = min(battery.charge_rate, available_energy)
             schedule[i] -= discharge_amount
             current_soc -= discharge_amount / battery.capacity
-            
-        # Store predicted SOC for current hour
-        predicted_soc[i] = current_soc
+        
+        # Store predicted SOC for next period start
+        predicted_soc[i + 1] = current_soc
     
     return schedule, predicted_soc, consumption_stats
