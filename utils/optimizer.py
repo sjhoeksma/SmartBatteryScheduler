@@ -79,19 +79,16 @@ def optimize_schedule(prices, battery):
                 schedule[i] = max_charge
                 charge_events += 1
                 daily_cycles += max_charge / battery.capacity
-                consumption_change = 0  # Grid supplies consumption
+                consumption_impact = 0  # Grid supplies consumption
             else:
                 schedule[i] = 0  # No battery activity
-                consumption_change = 0  # Grid supplies consumption
+                consumption_impact = 0  # Grid supplies consumption
         else:
-            # Normal operation when above min_soc
-            if current_soc - (home_consumption / battery.capacity) >= battery.min_soc:
-                schedule[i] = -home_consumption
-                consumption_change = home_consumption / battery.capacity
-            else:
-                available_discharge = (current_soc - battery.min_soc) * battery.capacity
-                schedule[i] = -available_discharge
-                consumption_change = available_discharge / battery.capacity
+            # Calculate consumption impact with min_soc protection
+            consumption_impact = min(
+                home_consumption / battery.capacity,
+                current_soc - battery.min_soc  # Limit consumption to available capacity above min_soc
+            ) if current_soc > battery.min_soc else 0
         
         # Then optimize based on prices if we haven't exceeded event limits
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
@@ -120,17 +117,13 @@ def optimize_schedule(prices, battery):
                     discharge_events += 1
                     daily_cycles += max_allowed_discharge / battery.capacity
         
-        # Calculate total SOC change for this hour with min_soc protection
-        consumption_impact = min(
-            home_consumption / battery.capacity,
-            current_soc - battery.min_soc  # Limit consumption to available capacity above min_soc
-        )
         strategic_change = (schedule[i] / battery.capacity)
         total_change = strategic_change - consumption_impact
-
+        
         # Ensure we never go below min_soc
         if current_soc + total_change < battery.min_soc:
             total_change = battery.min_soc - current_soc
+            schedule[i] = (battery.min_soc - current_soc + consumption_impact) * battery.capacity
         
         # Calculate intermediate points with averaged transitions
         for j in range(4):

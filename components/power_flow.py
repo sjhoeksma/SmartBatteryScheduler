@@ -39,22 +39,28 @@ def render_power_flow(battery):
             battery_power = battery.get_current_power()
             return grid_power, home_consumption, battery_power
         
-        # Initial values
+        # Get initial power values
         grid_power, home_consumption, battery_power = update_power_values()
         
-        # Calculate all power flows at once to avoid undefined variables
-        grid_consumption = max(0, grid_power)
-        grid_discharge = abs(min(0, grid_power))
-        battery_to_home = min(abs(min(0, battery_power)), home_consumption) if battery_power < 0 else 0
-        battery_to_grid = abs(min(0, battery_power)) - battery_to_home if battery_power < 0 else 0
-        home_from_battery = battery_to_home
-        home_from_grid = max(0, home_consumption - home_from_battery)
+        # Pre-calculate all power flows
+        grid_consumption = max(0, grid_power)  # Power from grid
+        grid_discharge = abs(min(0, grid_power))  # Power to grid
+        
+        # Calculate battery discharge flows
+        battery_discharge = abs(min(0, battery_power))  # Total battery discharge
+        battery_to_home = min(battery_discharge, home_consumption)  # Battery power used by home
+        battery_to_grid = battery_discharge - battery_to_home  # Remaining battery power to grid
+        
+        # Calculate home consumption sources
+        home_from_battery = battery_to_home  # Home consumption from battery
+        home_from_grid = max(0, home_consumption - home_from_battery)  # Home consumption from grid
         
         with display_container.container():
             cols = st.columns(3)
             
             # Grid metrics
             with cols[0]:
+                st.markdown("### " + get_text("grid_power"))
                 if grid_consumption > 0:
                     st.metric(
                         f"{get_text('grid_power')} {get_flow_direction(grid_consumption)}", 
@@ -66,11 +72,12 @@ def render_power_flow(battery):
                     st.metric(
                         f"{get_text('grid_discharge')} {get_flow_direction(-grid_discharge)}", 
                         f"{grid_discharge:.1f} kW",
-                        delta=get_text("discharge_to_grid")
+                        delta=get_text("return")
                     )
             
             # Battery metrics
             with cols[1]:
+                st.markdown("### " + get_text("battery_power"))
                 # Battery SOC indicator
                 soc_text = (
                     f"🔋 {battery.current_soc*100:.1f}% (Min SOC)"
@@ -105,6 +112,7 @@ def render_power_flow(battery):
             
             # Home consumption metrics
             with cols[2]:
+                st.markdown("### " + get_text("home_consumption"))
                 if home_from_grid > 0:
                     st.metric(
                         f"{get_text('home_consumption')} (Grid) {get_flow_direction(-home_from_grid)}", 
@@ -142,7 +150,7 @@ def render_power_flow(battery):
             
             # Show energy balance
             total_input = grid_consumption + (battery_power if battery_power > 0 else 0)
-            total_output = home_consumption + battery_to_grid  # Now battery_to_grid is always defined
+            total_output = home_consumption + battery_to_grid
             energy_balance = total_input - total_output
             
             st.metric(
