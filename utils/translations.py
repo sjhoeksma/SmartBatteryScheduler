@@ -112,6 +112,22 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Home Consumption",
         nl="Thuisverbruik"
     ),
+    "grid_discharge": Translation(
+        en="Grid Discharge",
+        nl="Netontlading"
+    ),
+    "home_discharge": Translation(
+        en="Home Discharge",
+        nl="Thuisontlading"
+    ),
+    "discharge_to_grid": Translation(
+        en="Discharging to Grid",
+        nl="Ontladen naar Net"
+    ),
+    "discharge_to_home": Translation(
+        en="Discharging to Home",
+        nl="Ontladen naar Huis"
+    ),
     
     # Battery configuration translations
     "battery_config": Translation(

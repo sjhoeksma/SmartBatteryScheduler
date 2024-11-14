@@ -1,8 +1,7 @@
 import streamlit as st
 from utils.translations import get_text
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
-import time
 from utils.ecactus_client import get_ecactus_client
 
 def get_flow_direction(power):
@@ -19,8 +18,8 @@ def render_power_flow(battery):
         # Create container for real-time updates
         display_container = st.empty()
         
-        # Function to update power values
         def update_power_values():
+            """Get power values from API or simulation"""
             try:
                 client = get_ecactus_client()
                 power_data = client.get_power_consumption()
@@ -30,18 +29,26 @@ def render_power_flow(battery):
                         power_data['home_consumption'],
                         power_data['battery_power']
                     )
-            except (ValueError, Exception) as e:
+            except Exception:
                 pass
             
             # Fallback to simulated values if API fails
-            timestamp = time.time()
-            grid_power = np.sin(timestamp / 10) * 2 + 3
-            home_consumption = abs(np.sin(timestamp / 10 + 1)) * 1.5 + 1
+            current_time = datetime.now().timestamp()
+            grid_power = np.sin(current_time / 10) * 2 + 3
+            home_consumption = abs(np.sin(current_time / 10 + 1)) * 1.5 + 1
             battery_power = battery.get_current_power()
             return grid_power, home_consumption, battery_power
         
         # Initial values
         grid_power, home_consumption, battery_power = update_power_values()
+        
+        # Calculate separated discharge values
+        total_discharge = abs(min(battery_power, 0))
+        home_discharge = min(total_discharge, home_consumption)
+        grid_discharge = max(0, total_discharge - home_consumption)
+        
+        # Calculate actual grid consumption (excluding battery discharge to grid)
+        net_grid_consumption = max(0, grid_power - grid_discharge)
         
         with display_container.container():
             # Display power flow metrics in three columns
@@ -49,19 +56,35 @@ def render_power_flow(battery):
             
             # Grid metrics
             with cols[0]:
-                st.metric(
-                    f"{get_text('grid_power')} {get_flow_direction(grid_power)}", 
-                    f"{abs(grid_power):.1f} kW",
-                    delta=get_text("supply") if grid_power > 0 else get_text("return")
-                )
+                if net_grid_consumption > 0:
+                    st.metric(
+                        f"{get_text('grid_power')} {get_flow_direction(net_grid_consumption)}", 
+                        f"{net_grid_consumption:.1f} kW",
+                        delta=get_text("supply")
+                    )
+                if grid_discharge > 0:
+                    st.metric(
+                        f"{get_text('grid_discharge')} {get_flow_direction(-grid_discharge)}", 
+                        f"{grid_discharge:.1f} kW",
+                        delta=get_text("discharge_to_grid")
+                    )
             
             # Battery metrics
             with cols[1]:
-                st.metric(
-                    f"{get_text('battery_power')} {get_flow_direction(battery_power)}", 
-                    f"{abs(battery_power):.1f} kW",
-                    delta=get_text("charging") if battery_power > 0 else get_text("discharging")
-                )
+                if battery_power > 0:
+                    st.metric(
+                        f"{get_text('battery_power')} {get_flow_direction(battery_power)}", 
+                        f"{battery_power:.1f} kW",
+                        delta=get_text("charging")
+                    )
+                elif battery_power < 0:
+                    if home_discharge > 0:
+                        st.metric(
+                            f"{get_text('home_discharge')} {get_flow_direction(-home_discharge)}", 
+                            f"{home_discharge:.1f} kW",
+                            delta=get_text("discharge_to_home")
+                        )
+                
                 # Add battery charge level
                 st.progress(
                     value=battery.current_soc,
@@ -79,27 +102,40 @@ def render_power_flow(battery):
             # Display flow information
             st.markdown("### " + get_text("power_flow_status"))
             
-            # Calculate net power flow
-            net_flow = grid_power + battery_power - home_consumption
+            # Show power flow status with emojis and separated discharge flows
+            status_messages = []
             
-            # Show power flow status with emojis
-            if grid_power > 0:
-                if battery_power > 0:
-                    st.info("⚡ Grid → Home & Battery 🔋")
-                else:
-                    st.info("⚡ Grid → Home 🏠")
+            # Grid to home flow
+            if net_grid_consumption > 0:
+                status_messages.append("⚡ Grid → 🏠 Home")
+            
+            # Battery flows
+            if battery_power > 0:
+                status_messages.append("⚡ Grid → 🔋 Battery")
             elif battery_power < 0:
-                st.info("🔋 Battery → Home 🏠")
-            else:
-                st.info("🏠 Home self-consuming")
+                if home_discharge > 0:
+                    status_messages.append("🔋 Battery → 🏠 Home")
+                if grid_discharge > 0:
+                    status_messages.append("🔋 Battery → ⚡ Grid")
             
-            # Show energy balance
+            # Default message if no active flows
+            if not status_messages:
+                status_messages.append("🏠 Home self-consuming")
+            
+            # Display all active power flows
+            for message in status_messages:
+                st.info(message)
+            
+            # Show detailed energy balance
+            total_input = net_grid_consumption + (battery_power if battery_power > 0 else 0)
+            total_output = home_consumption + (abs(battery_power) if battery_power < 0 else 0)
+            energy_balance = total_input - total_output
+            
             st.metric(
                 get_text("energy_balance"),
-                f"{abs(net_flow):.1f} kW",
-                delta=get_text("surplus") if net_flow > 0 else get_text("deficit")
+                f"{abs(energy_balance):.1f} kW",
+                delta=get_text("surplus") if energy_balance > 0 else get_text("deficit")
             )
-
+            
     except Exception as e:
         st.error(f"Error rendering power flow visualization: {str(e)}")
-        st.exception(e)  # Show detailed error information
