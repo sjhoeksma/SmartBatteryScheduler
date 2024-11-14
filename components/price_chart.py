@@ -94,14 +94,16 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     # SOC prediction trace (top layer)
     if predicted_soc is not None:
-        # Align SOC predictions with hour starts
-        soc_times = prices.index
-        
+        # Use the same timestamps as prices for SOC predictions
         fig.add_trace(go.Scatter(
-            x=soc_times,
+            x=prices.index,
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
-            line=dict(color="rgba(155, 89, 182, 0.9)", width=3),  # Purple with higher width
+            line=dict(
+                color="rgba(155, 89, 182, 0.9)",  # Purple with higher opacity
+                width=3,
+                shape='hv'  # Use step interpolation for better hour alignment
+            ),
             mode='lines',
             yaxis="y3",
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"

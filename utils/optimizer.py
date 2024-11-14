@@ -20,7 +20,8 @@ def optimize_schedule(prices, battery):
     """
     periods = len(prices)
     schedule = np.zeros(periods)
-    predicted_soc = np.zeros(periods + 1)  # Add extra period for hour start alignment
+    # Initialize SOC array with the same length as prices
+    predicted_soc = np.zeros(periods)
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
     # Calculate price thresholds for decision making
@@ -33,11 +34,11 @@ def optimize_schedule(prices, battery):
     charge_threshold = median_price - 0.5 * price_std
     discharge_threshold = median_price + 0.5 * price_std
     
-    # Track battery state through schedule
+    # Start with current battery SOC
     current_soc = battery.current_soc
-    predicted_soc[0] = current_soc  # Start of first hour
+    predicted_soc[0] = current_soc
     
-    # Process periods sequentially
+    # Process each period
     for i in range(periods):
         current_price = effective_prices.iloc[i]
         current_datetime = prices.index[i]
@@ -75,10 +76,7 @@ def optimize_schedule(prices, battery):
             schedule[i] -= discharge_amount
             current_soc -= discharge_amount / battery.capacity
             
-        # Store predicted SOC for start of next hour
-        predicted_soc[i + 1] = current_soc
-    
-    # Remove the extra prediction point for alignment
-    predicted_soc = predicted_soc[:-1]
+        # Store predicted SOC for current hour
+        predicted_soc[i] = current_soc
     
     return schedule, predicted_soc, consumption_stats
