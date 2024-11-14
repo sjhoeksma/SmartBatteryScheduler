@@ -60,29 +60,20 @@ def optimize_schedule(prices, battery):
         # Calculate home consumption for this hour with seasonal adjustment
         home_consumption = battery.get_hourly_consumption(hour, current_datetime)
         
-        # Calculate available energy while respecting min_soc
-        available_energy = battery.capacity * (current_soc - battery.min_soc)
-        
-        # Ensure we don't discharge below min_soc
-        max_discharge = min(
-            available_energy,
-            battery.charge_rate,
-            (current_soc - battery.min_soc) * battery.capacity
-        )
-        
-        # Handle home consumption
-        if available_energy >= home_consumption:
-            # Can supply home consumption from battery, but check min_soc
-            actual_discharge = min(home_consumption, max_discharge)
-            schedule[i] = -actual_discharge
-            consumption_change = actual_discharge / battery.capacity
+        # Handle home consumption with proper min_soc check
+        if current_soc - (home_consumption / battery.capacity) >= battery.min_soc:
+            # Can safely supply home consumption from battery
+            schedule[i] = -home_consumption
+            consumption_change = home_consumption / battery.capacity
         else:
-            # Need to charge to meet home consumption
-            needed_charge = home_consumption - available_energy
-            if battery.can_charge(needed_charge) and charge_events < battery.max_charge_events:
-                schedule[i] = needed_charge
-                consumption_change = -needed_charge / battery.capacity
-                charge_events += 1
+            # Can only discharge until min_soc, need to get rest from grid
+            available_discharge = (current_soc - battery.min_soc) * battery.capacity
+            if available_discharge > 0:
+                schedule[i] = -available_discharge
+                consumption_change = available_discharge / battery.capacity
+            else:
+                schedule[i] = 0
+                consumption_change = 0
         
         # Track cycles from consumption
         daily_cycles += abs(consumption_change)
@@ -105,24 +96,30 @@ def optimize_schedule(prices, battery):
                     charge_events += 1
                     daily_cycles += max_allowed_charge / battery.capacity
                     
-            elif current_price >= discharge_threshold and available_energy > 0 and discharge_events < battery.max_discharge_events:
+            elif current_price >= discharge_threshold and current_soc > battery.min_soc and discharge_events < battery.max_discharge_events:
                 # Discharge during high price periods with min_soc constraint
                 max_allowed_discharge = min(
                     battery.charge_rate,
-                    available_energy,
-                    remaining_cycles * battery.capacity,
-                    (current_soc - battery.min_soc) * battery.capacity
+                    battery.capacity * (current_soc - battery.min_soc),
+                    remaining_cycles * battery.capacity
                 )
                 if max_allowed_discharge > 0:
                     schedule[i] -= max_allowed_discharge
                     discharge_events += 1
                     daily_cycles += max_allowed_discharge / battery.capacity
         
-        # Calculate total SOC change for this hour
-        consumption_impact = (home_consumption / battery.capacity)
+        # Calculate total SOC change for this hour with min_soc protection
+        consumption_impact = min(
+            home_consumption / battery.capacity,
+            current_soc - battery.min_soc  # Limit consumption to available capacity above min_soc
+        )
         strategic_change = (schedule[i] / battery.capacity)
         total_change = strategic_change - consumption_impact
 
+        # Ensure we never go below min_soc
+        if current_soc + total_change < battery.min_soc:
+            total_change = battery.min_soc - current_soc
+        
         # Calculate intermediate points with averaged transitions
         for j in range(4):
             point_index = i * 4 + j + 1
