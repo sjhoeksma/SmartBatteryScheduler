@@ -44,7 +44,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             x=prices.index,
             y=home_usage,
             name="Home Usage",
-            line=dict(color="black", width=2)
+            line=dict(color="black", width=2),
+            mode='lines'  # Explicitly set to lines only
         ))
         
         # Add seasonal baseline
@@ -53,6 +54,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=seasonal_trend,
             name="Seasonal Baseline",
             line=dict(color="red", width=2, dash="dot"),
+            mode='lines',  # Explicitly set to lines only
             opacity=0.7
         ))
 
@@ -63,7 +65,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             x=prices.index,
             y=schedule,
             name="Load Strategy",
-            line=dict(color="purple", width=2)
+            line=dict(color="purple", width=2),
+            mode='lines'  # Explicitly set to lines only
         ))
     
     # SOC prediction trace (third y-axis)
@@ -73,6 +76,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
             line=dict(color="orange", width=2, dash="dot"),
+            mode='lines',  # Explicitly set to lines only
             yaxis="y3"
         ))
     
