@@ -68,10 +68,10 @@ def get_base_figure_layout():
     }
 
 @st.cache_data(ttl=300)  # Cache color calculations for 5 minutes
-def get_price_colors(dates):
+def get_price_colors(_dates):
     """Calculate and cache price period colors"""
     colors = []
-    for date in dates:
+    for date in _dates:
         hour = date.hour
         if hour in [7, 8, 9, 17, 18, 19, 20]:
             colors.append("rgba(255, 99, 71, 0.3)")  # Peak
