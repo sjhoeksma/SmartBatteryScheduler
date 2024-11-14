@@ -13,13 +13,15 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     fig = go.Figure()
     
-    # Add price trace (secondary y-axis)
-    fig.add_trace(go.Scatter(
+    # Add price bars (secondary y-axis)
+    fig.add_trace(go.Bar(
         x=prices.index,
         y=prices.values,
         name="Energy Price",
-        line=dict(color="blue", width=2),
-        yaxis="y2"
+        marker_color="blue",
+        opacity=0.7,
+        yaxis="y2",
+        width=3600000  # 1 hour in milliseconds for block width
     ))
     
     # Add home usage line with enhanced seasonal pattern visualization
@@ -159,7 +161,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=0.99,
             xanchor="left",
             x=0.01
-        )
+        ),
+        bargap=0  # Remove gaps between bars
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -170,4 +173,5 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     - The black line shows actual home usage including hourly variations
     - The red dotted line shows the seasonal baseline consumption
     - Seasonal factors adjust consumption based on the month (higher in winter, lower in summer)
+    - Energy prices are shown as hourly blocks to reflect actual market trading periods
     """)

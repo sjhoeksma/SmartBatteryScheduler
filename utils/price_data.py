@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 def get_day_ahead_prices():
     """
     Get day-ahead energy prices for the Netherlands
-    Returns hourly prices for the available hours
+    Returns hourly block prices for the available hours
     
     The day-ahead prices are published daily around 13:00 CET for the next day
     """
@@ -28,14 +28,20 @@ def get_day_ahead_prices():
     # Simulate realistic Dutch energy prices (€/kWh)
     base_price = 0.22
     peak_hours = [7, 8, 9, 17, 18, 19, 20]
+    shoulder_hours = [10, 11, 12, 13, 14, 15, 16]
     
     prices = []
     for date in dates:
         hour = date.hour
         if hour in peak_hours:
+            # Peak hours have higher prices
             price = base_price * (1 + np.random.uniform(0.3, 0.5))
+        elif hour in shoulder_hours:
+            # Shoulder hours have moderate prices
+            price = base_price * (1 + np.random.uniform(0.1, 0.3))
         else:
-            price = base_price * (1 + np.random.uniform(-0.3, 0.1))
+            # Off-peak hours have lower prices
+            price = base_price * (1 + np.random.uniform(-0.3, 0.0))
         prices.append(price)
     
     return pd.Series(prices, index=dates)
