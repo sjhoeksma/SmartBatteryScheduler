@@ -14,13 +14,13 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     fig = go.Figure()
     
     # Define colors for different price periods
-    peak_color = "rgba(255, 99, 71, 0.7)"  # Tomato red
-    shoulder_color = "rgba(255, 165, 0, 0.7)"  # Orange
-    offpeak_color = "rgba(60, 179, 113, 0.7)"  # Medium sea green
+    peak_color = "rgba(255, 99, 71, 0.3)"  # Tomato red with lower opacity
+    shoulder_color = "rgba(255, 165, 0, 0.3)"  # Orange with lower opacity
+    offpeak_color = "rgba(60, 179, 113, 0.3)"  # Medium sea green with lower opacity
     
-    # Define updated colors for charging/discharging
-    charging_color = "rgba(46, 204, 113, 0.8)"  # Emerald green with opacity
-    discharging_color = "rgba(231, 76, 60, 0.8)"  # Pomegranate red with opacity
+    # Define updated colors for charging/discharging using blue shades
+    charging_color = "rgba(52, 152, 219, 0.9)"  # Peter River blue with high opacity
+    discharging_color = "rgba(41, 128, 185, 0.9)"  # Belize Hole blue with high opacity
     
     # Determine price period colors
     colors = []
@@ -33,7 +33,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         else:  # Off-peak hours
             colors.append(offpeak_color)
     
-    # Add price bars (secondary y-axis)
+    # Add price bars first (bottom layer)
     fig.add_trace(go.Bar(
         x=prices.index,
         y=prices.values,
@@ -44,27 +44,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         hovertemplate="Time: %{x}<br>Price: €%{y:.3f}/kWh<extra></extra>"
     ))
     
-    # Add home usage line
-    if 'battery' in st.session_state:
-        battery = st.session_state.battery
-        
-        # Calculate home usage
-        home_usage = []
-        for date in prices.index:
-            hourly_usage = battery.get_hourly_consumption(date.hour, date)
-            home_usage.append(hourly_usage)
-        
-        # Add actual consumption line
-        fig.add_trace(go.Scatter(
-            x=prices.index,
-            y=home_usage,
-            name="Home Usage",
-            line=dict(color="rgba(52, 73, 94, 0.9)", width=2),  # Updated to darker color
-            mode='lines',
-            hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
-        ))
-    
-    # Load strategy visualization (primary y-axis)
+    # Load strategy visualization (middle layer)
     if schedule is not None:
         # Convert schedule to discrete states
         charge_mask = schedule > 0
@@ -92,13 +72,33 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
                 hovertemplate="Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
             ))
     
-    # SOC prediction trace (third y-axis)
+    # Add home usage line (top layer)
+    if 'battery' in st.session_state:
+        battery = st.session_state.battery
+        
+        # Calculate home usage
+        home_usage = []
+        for date in prices.index:
+            hourly_usage = battery.get_hourly_consumption(date.hour, date)
+            home_usage.append(hourly_usage)
+        
+        # Add actual consumption line
+        fig.add_trace(go.Scatter(
+            x=prices.index,
+            y=home_usage,
+            name="Home Usage",
+            line=dict(color="rgba(52, 73, 94, 0.9)", width=2),
+            mode='lines',
+            hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
+        ))
+    
+    # SOC prediction trace (top layer)
     if predicted_soc is not None:
         fig.add_trace(go.Scatter(
             x=prices.index,
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
-            line=dict(color="rgba(241, 196, 15, 0.9)", width=2, dash="dot"),  # Updated to sunflower yellow
+            line=dict(color="rgba(241, 196, 15, 0.9)", width=2, dash="dot"),
             mode='lines',
             yaxis="y3",
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
@@ -119,18 +119,18 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             gridcolor="rgba(128, 128, 128, 0.2)",
             tickformat="%H:%M",
             tickangle=-45,
-            domain=[0, 0.85]  # Adjust plot width to accommodate legend
+            domain=[0, 0.85]
         ),
         yaxis=dict(
             title="Power (kW)",
-            titlefont=dict(color="rgba(52, 73, 94, 1.0)"),  # Updated to match home usage
+            titlefont=dict(color="rgba(52, 73, 94, 1.0)"),
             tickfont=dict(color="rgba(52, 73, 94, 1.0)"),
             gridcolor="rgba(128, 128, 128, 0.2)",
             zerolinecolor="rgba(128, 128, 128, 0.2)"
         ),
         yaxis2=dict(
             title="Price (€/kWh)",
-            titlefont=dict(color="rgba(41, 128, 185, 1.0)"),  # Updated to darker blue
+            titlefont=dict(color="rgba(41, 128, 185, 1.0)"),
             tickfont=dict(color="rgba(41, 128, 185, 1.0)"),
             anchor="x",
             overlaying="y",
@@ -139,7 +139,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         ),
         yaxis3=dict(
             title="State of Charge (%)",
-            titlefont=dict(color="rgba(241, 196, 15, 1.0)"),  # Updated to match SOC line
+            titlefont=dict(color="rgba(241, 196, 15, 1.0)"),
             tickfont=dict(color="rgba(241, 196, 15, 1.0)"),
             anchor="free",
             overlaying="y",
@@ -160,7 +160,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             bordercolor="rgba(128, 128, 128, 0.2)",
             borderwidth=1
         ),
-        margin=dict(l=50, r=150, t=50, b=50),  # Increased right margin for legend
+        margin=dict(l=50, r=150, t=50, b=50),
         height=600
     )
     
@@ -174,11 +174,11 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     - 🟢 **Off-peak Hours** (21:00-06:00): Usually lowest prices
     """)
     
-    # Add usage pattern explanation
+    # Add usage pattern explanation with updated color description
     st.info("""
     📈 **Usage Pattern Information**
     - The black line shows actual home usage including hourly variations
-    - Green bars indicate charging periods (buying energy)
-    - Red bars indicate discharging periods (using stored energy)
-    - Energy prices are shown as hourly blocks to reflect actual market trading periods
+    - Light blue bars indicate charging periods (buying energy)
+    - Dark blue bars indicate discharging periods (using stored energy)
+    - Energy prices are shown as hourly blocks with reduced opacity to highlight charging patterns
     """)
