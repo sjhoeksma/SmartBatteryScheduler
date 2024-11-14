@@ -15,7 +15,6 @@ class BatteryProfile:
     yearly_consumption: float = 5475.0  # Default yearly consumption (15 kWh * 365)
     monthly_distribution: Dict[int, float] = None  # Monthly consumption distribution factors
     surcharge_rate: float = 0.05  # Default surcharge rate in €/kWh
-    surcharge_hours: Dict[int, bool] = None  # Hours when surcharge applies
     
     def __post_init__(self):
         if self.monthly_distribution is None:
@@ -34,12 +33,6 @@ class BatteryProfile:
                 11: 1.0,
                 12: 1.15  # Winter
             }
-        if self.surcharge_hours is None:
-            # Initialize with default surcharge hours (peak hours)
-            self.surcharge_hours = {
-                hour: hour in [7, 8, 9, 17, 18, 19, 20]
-                for hour in range(24)
-            }
 
     def get_seasonal_factor(self, month: int) -> float:
         """Get seasonal adjustment factor for given month"""
@@ -50,10 +43,6 @@ class BatteryProfile:
         yearly_daily_avg = self.yearly_consumption / 365.0
         seasonal_factor = self.get_seasonal_factor(month)
         return yearly_daily_avg * seasonal_factor
-
-    def is_surcharge_hour(self, hour: int) -> bool:
-        """Check if surcharge applies for given hour"""
-        return self.surcharge_hours.get(hour, False)
 
 class BatteryProfileManager:
     def __init__(self):

@@ -22,7 +22,7 @@ def render_monthly_distribution(monthly_distribution):
         xaxis_title=get_text("month"),
         yaxis_title=get_text("consumption_factor"),
         xaxis=dict(tickmode='array', ticktext=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                   tickvals=months)
     )
     return fig
@@ -107,24 +107,8 @@ def render_battery_config():
                 max_value=0.5,
                 value=float(profile.surcharge_rate if profile else st.session_state.battery.surcharge_rate),
                 step=0.01,
-                help="Additional cost during peak hours"
+                help="Additional cost applied to energy prices"
             )
-        
-        # Surcharge hours selection
-        st.subheader("Surcharge Hours")
-        cols = st.columns(6)
-        surcharge_hours = profile.surcharge_hours if profile else st.session_state.battery.surcharge_hours
-        updated_surcharge_hours = {}
-        
-        for hour in range(24):
-            col_index = hour % 6
-            with cols[col_index]:
-                hour_enabled = st.checkbox(
-                    f"{hour:02d}:00",
-                    value=surcharge_hours.get(hour, False),
-                    key=f"surcharge_hour_{hour}"
-                )
-                updated_surcharge_hours[hour] = hour_enabled
         
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(
@@ -143,8 +127,7 @@ def render_battery_config():
                 usage_pattern=usage_pattern,
                 yearly_consumption=yearly_consumption,
                 monthly_distribution=profile.monthly_distribution if profile else None,
-                surcharge_rate=surcharge_rate,
-                surcharge_hours=updated_surcharge_hours
+                surcharge_rate=surcharge_rate
             )
             st.success(get_text("config_updated"))
     
@@ -164,8 +147,7 @@ def render_battery_config():
                     usage_pattern=st.session_state.battery.usage_pattern,
                     yearly_consumption=st.session_state.battery.yearly_consumption,
                     monthly_distribution=st.session_state.battery.monthly_distribution,
-                    surcharge_rate=st.session_state.battery.surcharge_rate,
-                    surcharge_hours=st.session_state.battery.surcharge_hours
+                    surcharge_rate=st.session_state.battery.surcharge_rate
                 )
                 st.session_state.profile_manager.add_profile(new_profile)
                 st.success(get_text("profile_created").format(new_name))
