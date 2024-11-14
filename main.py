@@ -27,10 +27,10 @@ st.set_page_config(
 def get_cached_prices(forecast_hours):
     return get_day_ahead_prices(forecast_hours=forecast_hours)
 
-# Cache optimization results
+# Cache optimization results with unhashable parameter marked with underscore
 @st.cache_data(ttl=1800)  # Cache for 30 minutes
-def get_cached_optimization(prices, battery_config):
-    return optimize_schedule(prices, battery_config)
+def get_cached_optimization(prices, _battery_config):
+    return optimize_schedule(prices, _battery_config)
 
 def main():
     # Add language selector to sidebar

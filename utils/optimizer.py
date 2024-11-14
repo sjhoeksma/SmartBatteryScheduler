@@ -5,11 +5,11 @@ from utils.price_data import get_price_forecast_confidence
 import streamlit as st
 
 @st.cache_data(ttl=300)  # Cache consumption patterns for 5 minutes
-def analyze_consumption_patterns(battery, dates):
+def analyze_consumption_patterns(_battery, dates):
     """Analyze consumption patterns and return statistical metrics"""
     consumptions = []
     for date in dates:
-        daily_consumption = battery.get_daily_consumption_for_date(date)
+        daily_consumption = _battery.get_daily_consumption_for_date(date)
         consumptions.append({
             'date': date,
             'consumption': daily_consumption
