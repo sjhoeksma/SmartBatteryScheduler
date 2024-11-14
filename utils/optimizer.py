@@ -2,7 +2,9 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from utils.price_data import get_price_forecast_confidence
+import streamlit as st
 
+@st.cache_data(ttl=300)  # Cache consumption patterns for 5 minutes
 def analyze_consumption_patterns(battery, dates):
     """Analyze consumption patterns and return statistical metrics"""
     consumptions = []
@@ -13,6 +15,16 @@ def analyze_consumption_patterns(battery, dates):
             'consumption': daily_consumption
         })
     return pd.DataFrame(consumptions)
+
+@st.cache_data(ttl=300)  # Cache price thresholds for 5 minutes
+def calculate_price_thresholds(effective_prices, date):
+    """Calculate price thresholds for a specific date"""
+    mask = effective_prices.index.date == date
+    daily_prices = effective_prices[mask]
+    return {
+        'median': np.median(daily_prices),
+        'std': np.std(daily_prices)
+    }
 
 def optimize_schedule(prices, battery):
     """
@@ -25,24 +37,16 @@ def optimize_schedule(prices, battery):
     predicted_soc = np.zeros(periods * 4 + 1)
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
-    # Initialize with current date
-    last_date = prices.index[0].date() if len(prices) > 0 else None
-    
-    # Calculate price thresholds with confidence weighting
+    # Calculate effective prices with confidence weighting
     effective_prices = pd.Series([
         battery.get_effective_price(price, date.hour) * get_price_forecast_confidence(date)
         for price, date in zip(prices.values, prices.index)
     ])
     
-    # Calculate dynamic thresholds for each day
-    daily_medians = {}
-    daily_stds = {}
-    
+    # Pre-calculate daily thresholds
+    daily_thresholds = {}
     for date in set(prices.index.date):
-        mask = prices.index.date == date
-        daily_prices = effective_prices[mask]
-        daily_medians[date] = np.median(daily_prices)
-        daily_stds[date] = np.std(daily_prices)
+        daily_thresholds[date] = calculate_price_thresholds(effective_prices, date)
     
     # Start with current battery SOC
     current_soc = battery.current_soc
@@ -51,7 +55,7 @@ def optimize_schedule(prices, battery):
     # Track charge/discharge events per day
     daily_events = {}
     
-    # Process each period
+    # Process each period with vectorized operations where possible
     for i in range(periods):
         current_datetime = prices.index[i]
         current_date = current_datetime.date()
@@ -67,18 +71,17 @@ def optimize_schedule(prices, battery):
             }
         
         # Get daily price thresholds
-        median_price = daily_medians[current_date]
-        price_std = daily_stds[current_date]
-        charge_threshold = median_price - 0.25 * price_std
-        discharge_threshold = median_price + 0.25 * price_std
+        thresholds = daily_thresholds[current_date]
+        charge_threshold = thresholds['median'] - 0.25 * thresholds['std']
+        discharge_threshold = thresholds['median'] + 0.25 * thresholds['std']
         
-        # Calculate home consumption for this hour with seasonal adjustment
+        # Calculate home consumption for this hour
         home_consumption = battery.get_hourly_consumption(hour, current_datetime)
         
         # Calculate remaining cycles for current day
         remaining_cycles = battery.max_daily_cycles - daily_events[current_date]['cycles']
         
-        # Handle home consumption with proper min_soc check
+        # Optimize charging/discharging decision
         if current_soc <= battery.min_soc:
             if (current_price <= charge_threshold and 
                 daily_events[current_date]['charge_events'] < battery.max_charge_events):
@@ -100,7 +103,7 @@ def optimize_schedule(prices, battery):
                 current_soc - battery.min_soc
             ) if current_soc > battery.min_soc else 0
         
-        # Optimize based on prices if we haven't exceeded event limits
+        # Optimize based on prices if possible
         available_capacity = battery.capacity * (battery.max_soc - current_soc)
         
         if remaining_cycles > 0 and available_capacity > 0:

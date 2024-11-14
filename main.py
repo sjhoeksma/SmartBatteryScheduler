@@ -22,6 +22,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Cache price data for better performance
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_cached_prices(forecast_hours):
+    return get_day_ahead_prices(forecast_hours=forecast_hours)
+
+# Cache optimization results
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
+def get_cached_optimization(prices, battery_config):
+    return optimize_schedule(prices, battery_config)
+
 def main():
     # Add language selector to sidebar
     add_language_selector()
@@ -46,10 +56,11 @@ def main():
             monthly_distribution=default_profile.monthly_distribution
         )
     
-    # Set forecast hours in session state if not present
+    # Initialize forecast hours and previous value in session state
     if 'forecast_hours' not in st.session_state:
         st.session_state.forecast_hours = 24
-
+        st.session_state.previous_forecast_hours = 24
+    
     # Layout
     tab1, tab2, tab3, tab4 = st.tabs([
         get_text("real_time_dashboard"),
@@ -64,19 +75,28 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             
-            # Add forecast hours selector
+            # Add debounced forecast hours selector
             forecast_hours = st.slider(
                 "Forecast Hours",
                 min_value=1,
                 max_value=48,
                 value=st.session_state.forecast_hours,
-                help="Select number of hours to forecast (maximum 48 hours)"
+                help="Select number of hours to forecast (maximum 48 hours)",
+                key="forecast_hours_slider"
             )
-            st.session_state.forecast_hours = forecast_hours
             
-            # Get extended price forecast
-            prices = get_day_ahead_prices(forecast_hours=forecast_hours)
-            schedule, predicted_soc, consumption_stats = optimize_schedule(
+            # Only update if the value has changed significantly (debouncing)
+            if abs(forecast_hours - st.session_state.previous_forecast_hours) >= 2:
+                st.session_state.forecast_hours = forecast_hours
+                st.session_state.previous_forecast_hours = forecast_hours
+                
+                # Clear the cache for the current parameters
+                get_cached_prices.clear()
+                get_cached_optimization.clear()
+            
+            # Get cached price forecast and optimization results
+            prices = get_cached_prices(st.session_state.forecast_hours)
+            schedule, predicted_soc, consumption_stats = get_cached_optimization(
                 prices,
                 st.session_state.battery
             )
