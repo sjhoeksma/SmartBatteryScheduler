@@ -99,36 +99,12 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
         ))
     
-    # Calculate average price and price ranges
-    avg_price = prices.mean()
-    min_price = prices.min()
-    max_price = prices.max()
-    
-    # Add next update time annotation if before 13:00
-    if not is_prices_available_for_tomorrow():
-        next_update = datetime.now().replace(hour=13, minute=0, second=0, microsecond=0)
-        if next_update < datetime.now():
-            next_update = next_update + timedelta(days=1)
-        fig.add_annotation(
-            x=prices.index[-1],
-            y=avg_price,
-            xref="x",
-            yref="y2",
-            text=f"Next update at 13:00 CET",
-            showarrow=False,
-            xanchor="right",
-            yanchor="top",
-            xshift=-10,
-            yshift=20,
-            font=dict(color="red")
-        )
-    
     # Update layout with enhanced settings
     fig.update_layout(
         title={
             'text': "Energy Prices and Usage Patterns",
-            'y':0.95,
-            'x':0.5,
+            'y': 0.95,
+            'x': 0.5,
             'xanchor': 'center',
             'yanchor': 'top',
             'font': dict(size=20)
@@ -137,7 +113,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             title="Time",
             gridcolor="rgba(128, 128, 128, 0.2)",
             tickformat="%H:%M",
-            tickangle=-45
+            tickangle=-45,
+            domain=[0, 0.85]  # Adjust plot width to accommodate legend
         ),
         yaxis=dict(
             title="Power (kW)",
@@ -150,12 +127,10 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             title="Price (€/kWh)",
             titlefont=dict(color="blue"),
             tickfont=dict(color="blue"),
-            anchor="free",
+            anchor="x",
             overlaying="y",
             side="right",
-            position=0.85,
-            range=[min_price * 0.9, max_price * 1.1],
-            gridcolor="rgba(128, 128, 128, 0.2)"
+            position=0.85
         ),
         yaxis3=dict(
             title="State of Charge (%)",
@@ -164,53 +139,24 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             anchor="free",
             overlaying="y",
             side="right",
-            position=1.0,
-            range=[0, 100],
-            gridcolor="rgba(128, 128, 128, 0.2)"
+            position=0.95,
+            range=[0, 100]
         ),
         plot_bgcolor="white",
         paper_bgcolor="white",
-        shapes=[
-            dict(
-                type="line",
-                yref="y2",
-                y0=avg_price,
-                y1=avg_price,
-                x0=prices.index[0],
-                x1=prices.index[-1],
-                line=dict(
-                    color="gray",
-                    dash="dash",
-                )
-            )
-        ],
-        annotations=[
-            dict(
-                x=prices.index[-1],
-                y=avg_price,
-                xref="x",
-                yref="y2",
-                text=f"Avg: €{avg_price:.3f}/kWh",
-                showarrow=False,
-                xanchor="left",
-                yanchor="bottom",
-                xshift=10,
-                font=dict(color="gray")
-            )
-        ],
-        hovermode='x unified',
         showlegend=True,
         legend=dict(
+            orientation="v",
             yanchor="top",
-            y=0.99,
+            y=1,
             xanchor="left",
-            x=0.01,
+            x=1.05,
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="rgba(128, 128, 128, 0.2)",
             borderwidth=1
         ),
-        bargap=0,  # Remove gaps between bars
-        margin=dict(l=50, r=50, t=50, b=50)
+        margin=dict(l=50, r=150, t=50, b=50),  # Increased right margin for legend
+        height=600
     )
     
     st.plotly_chart(fig, use_container_width=True)
