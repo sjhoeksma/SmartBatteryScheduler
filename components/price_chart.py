@@ -40,19 +40,15 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         hovertemplate="Time: %{x}<br>Price: €%{y:.3f}/kWh<extra></extra>"
     ))
     
-    # Add home usage line with enhanced seasonal pattern visualization
+    # Add home usage line
     if 'battery' in st.session_state:
         battery = st.session_state.battery
         
-        # Calculate home usage with seasonal factors
+        # Calculate home usage
         home_usage = []
-        seasonal_trend = []
         for date in prices.index:
             hourly_usage = battery.get_hourly_consumption(date.hour, date)
             home_usage.append(hourly_usage)
-            seasonal_factor = battery.monthly_distribution[date.month]
-            baseline = battery.daily_consumption / 24.0 * seasonal_factor
-            seasonal_trend.append(baseline)
         
         # Add actual consumption line
         fig.add_trace(go.Scatter(
@@ -62,17 +58,6 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             line=dict(color="black", width=2),
             mode='lines',
             hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
-        ))
-        
-        # Add seasonal baseline
-        fig.add_trace(go.Scatter(
-            x=prices.index,
-            y=seasonal_trend,
-            name="Seasonal Baseline",
-            line=dict(color="red", width=2, dash="dot"),
-            mode='lines',
-            opacity=0.7,
-            hovertemplate="Time: %{x}<br>Baseline: %{y:.2f} kW<extra></extra>"
         ))
 
     # Combined load strategy trace (primary y-axis)
@@ -169,11 +154,9 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     - 🟢 **Off-peak Hours** (21:00-06:00): Usually lowest prices
     """)
     
-    # Add seasonal pattern explanation
+    # Add usage pattern explanation
     st.info("""
     📈 **Usage Pattern Information**
     - The black line shows actual home usage including hourly variations
-    - The red dotted line shows the seasonal baseline consumption
-    - Seasonal factors adjust consumption based on the month (higher in winter, lower in summer)
     - Energy prices are shown as hourly blocks to reflect actual market trading periods
     """)
