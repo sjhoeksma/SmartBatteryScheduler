@@ -76,14 +76,14 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             
-            # Add forecast hours selector with extended range
+            # Add forecast hours selector with hour-by-hour adjustments
             forecast_hours = st.slider(
                 "Forecast Hours",
                 min_value=12,
                 max_value=36,
                 value=st.session_state.forecast_hours,
-                step=12,
-                help="Select number of hours to forecast (12-36 hours)"
+                step=1,
+                help="Select number of hours to forecast (12-36 hours, adjustable by hour)"
             )
             
             if forecast_hours != st.session_state.forecast_hours:
