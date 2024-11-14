@@ -17,10 +17,12 @@ def optimize_schedule(prices, battery):
     """
     Optimize charging schedule based on prices and battery constraints
     Returns charging power for each time period and predicted SOC values
+    with averaged transitions
     """
     periods = len(prices)
     schedule = np.zeros(periods)
-    predicted_soc = np.zeros(periods + 1)  # Add extra point for proper step visualization
+    # Create array for intermediate points (4 points per hour)
+    predicted_soc = np.zeros(periods * 4 + 1)
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
     # Calculate price thresholds for decision making
@@ -54,28 +56,41 @@ def optimize_schedule(prices, battery):
         if available_energy >= home_consumption:
             # Can supply home consumption from battery
             schedule[i] = -home_consumption
-            current_soc -= home_consumption / battery.capacity
+            consumption_change = home_consumption / battery.capacity
         else:
             # Need to charge to meet home consumption
             needed_charge = home_consumption - available_energy
             if battery.can_charge(needed_charge):
                 schedule[i] = needed_charge
-                current_soc += needed_charge / battery.capacity
-        
+                consumption_change = -needed_charge / battery.capacity
+            else:
+                consumption_change = 0
+
         # Then optimize based on prices
         if current_price <= charge_threshold and available_capacity > 0:
             # Charge during low price periods
             charge_amount = min(battery.charge_rate, available_capacity)
             schedule[i] += charge_amount
-            current_soc += charge_amount / battery.capacity
-            
+            charge_change = charge_amount / battery.capacity
         elif current_price >= discharge_threshold and available_energy > 0:
             # Discharge during high price periods
             discharge_amount = min(battery.charge_rate, available_energy)
             schedule[i] -= discharge_amount
-            current_soc -= discharge_amount / battery.capacity
+            charge_change = -discharge_amount / battery.capacity
+        else:
+            charge_change = 0
+
+        # Calculate total SOC change for this hour
+        total_change = charge_change - consumption_change
         
-        # Store predicted SOC for next period start
-        predicted_soc[i + 1] = current_soc
+        # Calculate intermediate points with averaged transitions
+        for j in range(4):
+            point_index = i * 4 + j + 1
+            # Use exponential smoothing for transitions
+            alpha = (j + 1) / 4  # Smoothing factor increases through the hour
+            predicted_soc[point_index] = current_soc + (total_change * alpha)
+        
+        # Update current SOC for next hour
+        current_soc += total_change
     
     return schedule, predicted_soc, consumption_stats

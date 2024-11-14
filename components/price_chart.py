@@ -94,10 +94,20 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     # SOC prediction trace (top layer)
     if predicted_soc is not None:
-        # Create extended timestamps for step-aligned SOC visualization
-        timestamps = list(prices.index)
-        if len(timestamps) > 0:
-            timestamps.append(timestamps[-1] + pd.Timedelta(hours=1))
+        # Create timestamps for intermediate points (4 points per hour)
+        base_timestamps = list(prices.index)
+        timestamps = []
+        for ts in base_timestamps:
+            # Add main hour point and three 15-minute interval points
+            timestamps.extend([
+                ts,
+                ts + pd.Timedelta(minutes=15),
+                ts + pd.Timedelta(minutes=30),
+                ts + pd.Timedelta(minutes=45)
+            ])
+        # Add final point
+        if len(base_timestamps) > 0:
+            timestamps.append(base_timestamps[-1] + pd.Timedelta(hours=1))
         
         fig.add_trace(go.Scatter(
             x=timestamps,
@@ -106,7 +116,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             line=dict(
                 color="rgba(155, 89, 182, 0.9)",  # Purple with higher opacity
                 width=3,
-                shape='hv'  # Use step interpolation for better hour alignment
+                shape='spline',  # Use spline interpolation for smooth transitions
+                smoothing=0.3  # Adjust smoothing factor for natural curves
             ),
             mode='lines',
             yaxis="y3",
@@ -190,5 +201,5 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     - Light blue bars indicate charging periods (buying energy)
     - Dark blue bars indicate discharging periods (using stored energy)
     - Energy prices are shown as hourly blocks with reduced opacity to highlight charging patterns
-    - Purple line shows predicted battery State of Charge (SOC) aligned to hour boundaries
+    - Purple line shows predicted battery State of Charge (SOC) with smooth transitions
     """)
