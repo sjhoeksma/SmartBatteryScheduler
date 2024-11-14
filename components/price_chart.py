@@ -13,15 +13,31 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     fig = go.Figure()
     
+    # Define colors for different price periods
+    peak_color = "rgba(255, 99, 71, 0.7)"  # Tomato red
+    shoulder_color = "rgba(255, 165, 0, 0.7)"  # Orange
+    offpeak_color = "rgba(60, 179, 113, 0.7)"  # Medium sea green
+    
+    # Determine price period colors
+    colors = []
+    for idx in prices.index:
+        hour = idx.hour
+        if hour in [7, 8, 9, 17, 18, 19, 20]:  # Peak hours
+            colors.append(peak_color)
+        elif hour in [10, 11, 12, 13, 14, 15, 16]:  # Shoulder hours
+            colors.append(shoulder_color)
+        else:  # Off-peak hours
+            colors.append(offpeak_color)
+    
     # Add price bars (secondary y-axis)
     fig.add_trace(go.Bar(
         x=prices.index,
         y=prices.values,
         name="Energy Price",
-        marker_color="blue",
-        opacity=0.7,
+        marker_color=colors,
         yaxis="y2",
-        width=3600000  # 1 hour in milliseconds for block width
+        width=3600000,  # 1 hour in milliseconds for block width
+        hovertemplate="Time: %{x}<br>Price: €%{y:.3f}/kWh<extra></extra>"
     ))
     
     # Add home usage line with enhanced seasonal pattern visualization
@@ -34,7 +50,6 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         for date in prices.index:
             hourly_usage = battery.get_hourly_consumption(date.hour, date)
             home_usage.append(hourly_usage)
-            # Calculate seasonal baseline
             seasonal_factor = battery.monthly_distribution[date.month]
             baseline = battery.daily_consumption / 24.0 * seasonal_factor
             seasonal_trend.append(baseline)
@@ -45,7 +60,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=home_usage,
             name="Home Usage",
             line=dict(color="black", width=2),
-            mode='lines'  # Explicitly set to lines only
+            mode='lines',
+            hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
         ))
         
         # Add seasonal baseline
@@ -54,8 +70,9 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=seasonal_trend,
             name="Seasonal Baseline",
             line=dict(color="red", width=2, dash="dot"),
-            mode='lines',  # Explicitly set to lines only
-            opacity=0.7
+            mode='lines',
+            opacity=0.7,
+            hovertemplate="Time: %{x}<br>Baseline: %{y:.2f} kW<extra></extra>"
         ))
 
     # Combined load strategy trace (primary y-axis)
@@ -66,7 +83,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=schedule,
             name="Load Strategy",
             line=dict(color="purple", width=2),
-            mode='lines'  # Explicitly set to lines only
+            mode='lines',
+            hovertemplate="Time: %{x}<br>Load: %{y:.2f} kW<extra></extra>"
         ))
     
     # SOC prediction trace (third y-axis)
@@ -76,12 +94,15 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
             line=dict(color="orange", width=2, dash="dot"),
-            mode='lines',  # Explicitly set to lines only
-            yaxis="y3"
+            mode='lines',
+            yaxis="y3",
+            hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
         ))
     
-    # Calculate average price
+    # Calculate average price and price ranges
     avg_price = prices.mean()
+    min_price = prices.min()
+    max_price = prices.max()
     
     # Add next update time annotation if before 13:00
     if not is_prices_available_for_tomorrow():
@@ -102,14 +123,28 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             font=dict(color="red")
         )
     
-    # Update layout with triple y-axes
+    # Update layout with enhanced settings
     fig.update_layout(
-        title="Energy Prices and Usage Patterns",
-        xaxis_title="Time",
+        title={
+            'text': "Energy Prices and Usage Patterns",
+            'y':0.95,
+            'x':0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(size=20)
+        },
+        xaxis=dict(
+            title="Time",
+            gridcolor="rgba(128, 128, 128, 0.2)",
+            tickformat="%H:%M",
+            tickangle=-45
+        ),
         yaxis=dict(
             title="Power (kW)",
             titlefont=dict(color="purple"),
-            tickfont=dict(color="purple")
+            tickfont=dict(color="purple"),
+            gridcolor="rgba(128, 128, 128, 0.2)",
+            zerolinecolor="rgba(128, 128, 128, 0.2)"
         ),
         yaxis2=dict(
             title="Price (€/kWh)",
@@ -118,7 +153,9 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             anchor="free",
             overlaying="y",
             side="right",
-            position=0.85
+            position=0.85,
+            range=[min_price * 0.9, max_price * 1.1],
+            gridcolor="rgba(128, 128, 128, 0.2)"
         ),
         yaxis3=dict(
             title="State of Charge (%)",
@@ -128,8 +165,11 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             overlaying="y",
             side="right",
             position=1.0,
-            range=[0, 100]
+            range=[0, 100],
+            gridcolor="rgba(128, 128, 128, 0.2)"
         ),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
         shapes=[
             dict(
                 type="line",
@@ -150,7 +190,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
                 y=avg_price,
                 xref="x",
                 yref="y2",
-                text=f"Avg: €{avg_price:.2f}/kWh",
+                text=f"Avg: €{avg_price:.3f}/kWh",
                 showarrow=False,
                 xanchor="left",
                 yanchor="bottom",
@@ -164,12 +204,24 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             yanchor="top",
             y=0.99,
             xanchor="left",
-            x=0.01
+            x=0.01,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="rgba(128, 128, 128, 0.2)",
+            borderwidth=1
         ),
-        bargap=0  # Remove gaps between bars
+        bargap=0,  # Remove gaps between bars
+        margin=dict(l=50, r=50, t=50, b=50)
     )
     
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Add legend explaining price periods
+    st.markdown("""
+    ### Price Period Legend
+    - 🔴 **Peak Hours** (07:00-09:00, 17:00-20:00): Typically highest prices
+    - 🟠 **Shoulder Hours** (10:00-16:00): Moderate prices
+    - 🟢 **Off-peak Hours** (21:00-06:00): Usually lowest prices
+    """)
     
     # Add seasonal pattern explanation
     st.info("""
