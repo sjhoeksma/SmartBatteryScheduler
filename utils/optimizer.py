@@ -19,7 +19,10 @@ def analyze_consumption_patterns(_battery, _dates):
 @st.cache_data(ttl=300)  # Cache price thresholds for 5 minutes
 def calculate_price_thresholds(_effective_prices, _date):
     """Calculate price thresholds for a specific date"""
-    mask = _effective_prices.index.date == _date
+    # Convert _date to datetime.date if it isn't already
+    target_date = _date.date() if hasattr(_date, 'date') else _date
+    # Use datetime index properly
+    mask = pd.to_datetime(_effective_prices.index).date == target_date
     daily_prices = _effective_prices[mask]
     return {
         'median': np.median(daily_prices),
@@ -37,11 +40,12 @@ def optimize_schedule(_prices, _battery):
     predicted_soc = np.zeros(periods * 4 + 1)
     consumption_stats = analyze_consumption_patterns(_battery, _prices.index)
     
-    # Calculate effective prices with confidence weighting
-    effective_prices = pd.Series([
-        _battery.get_effective_price(price, date.hour) * get_price_forecast_confidence(date)
-        for price, date in zip(_prices.values, _prices.index)
-    ])
+    # Calculate effective prices with confidence weighting and preserve datetime index
+    effective_prices = pd.Series(
+        [_battery.get_effective_price(price, date.hour) * get_price_forecast_confidence(date)
+         for price, date in zip(_prices.values, _prices.index)],
+        index=_prices.index  # Preserve the datetime index
+    )
     
     # Pre-calculate daily thresholds
     daily_thresholds = {}
