@@ -109,13 +109,14 @@ def optimize_schedule(prices, battery):
                     daily_cycles += max_allowed_discharge / battery.capacity
         
         # Calculate total SOC change for this hour
-        total_change = (schedule[i] / battery.capacity)
-        
+        consumption_impact = (home_consumption / battery.capacity)
+        strategic_change = (schedule[i] / battery.capacity)
+        total_change = strategic_change - consumption_impact
+
         # Calculate intermediate points with averaged transitions
         for j in range(4):
             point_index = i * 4 + j + 1
-            # Use exponential smoothing for transitions
-            alpha = (j + 1) / 4  # Smoothing factor increases through the hour
+            alpha = (j + 1) / 4
             predicted_soc[point_index] = current_soc + (total_change * alpha)
         
         # Update current SOC for next hour
