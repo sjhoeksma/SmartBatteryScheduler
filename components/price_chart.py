@@ -16,7 +16,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     # Define colors for different price periods
     peak_color = "rgba(255, 99, 71, 0.3)"  # Tomato red with lower opacity
     shoulder_color = "rgba(255, 165, 0, 0.3)"  # Orange with lower opacity
-    offpeak_color = "rgba(60, 179, 113, 0.3)"  # Medium sea green with lower opacity
+    offpeak_color = "rgba(34, 139, 34, 0.3)"  # Forest green with lower opacity
     
     # Define updated colors for charging/discharging using blue shades
     charging_color = "rgba(52, 152, 219, 0.9)"  # Peter River blue with high opacity
