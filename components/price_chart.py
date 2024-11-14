@@ -59,18 +59,34 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             mode='lines',
             hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
         ))
-
-    # Combined load strategy trace (primary y-axis)
+    
+    # Load strategy visualization (primary y-axis)
     if schedule is not None:
-        schedule = np.where(np.abs(schedule) < 1e-6, 0, schedule)
-        fig.add_trace(go.Scatter(
-            x=prices.index,
-            y=schedule,
-            name="Load Strategy",
-            line=dict(color="purple", width=2),
-            mode='lines',
-            hovertemplate="Time: %{x}<br>Load: %{y:.2f} kW<extra></extra>"
-        ))
+        # Convert schedule to discrete states
+        charge_mask = schedule > 0
+        discharge_mask = schedule < 0
+        
+        # Add charging bars
+        if any(charge_mask):
+            fig.add_trace(go.Bar(
+                x=prices.index[charge_mask],
+                y=schedule[charge_mask],
+                name="Charging",
+                marker_color="green",
+                width=3600000,  # 1 hour in milliseconds
+                hovertemplate="Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"
+            ))
+        
+        # Add discharging bars
+        if any(discharge_mask):
+            fig.add_trace(go.Bar(
+                x=prices.index[discharge_mask],
+                y=schedule[discharge_mask],
+                name="Discharging",
+                marker_color="red",
+                width=3600000,  # 1 hour in milliseconds
+                hovertemplate="Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
+            ))
     
     # SOC prediction trace (third y-axis)
     if predicted_soc is not None:
@@ -103,8 +119,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         ),
         yaxis=dict(
             title="Power (kW)",
-            titlefont=dict(color="purple"),
-            tickfont=dict(color="purple"),
+            titlefont=dict(color="black"),
+            tickfont=dict(color="black"),
             gridcolor="rgba(128, 128, 128, 0.2)",
             zerolinecolor="rgba(128, 128, 128, 0.2)"
         ),
@@ -158,5 +174,6 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     st.info("""
     📈 **Usage Pattern Information**
     - The black line shows actual home usage including hourly variations
+    - Green bars indicate charging periods, red bars indicate discharging
     - Energy prices are shown as hourly blocks to reflect actual market trading periods
     """)
