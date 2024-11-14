@@ -22,15 +22,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Cache price data for better performance
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+# Cache price data for better performance with variable TTL based on forecast hours
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def get_cached_prices(forecast_hours):
+    """Get cached price data with variable cache duration"""
     return get_day_ahead_prices(forecast_hours=forecast_hours)
 
-# Cache optimization results with unhashable parameter marked with underscore
-@st.cache_data(ttl=1800)  # Cache for 30 minutes
-def get_cached_optimization(prices, _battery_config):
-    return optimize_schedule(prices, _battery_config)
+# Cache optimization results
+@st.cache_data(ttl=900)  # Cache for 15 minutes
+def get_cached_optimization(_prices, _battery):
+    """Get cached optimization results"""
+    return optimize_schedule(_prices, _battery)
 
 def main():
     # Add language selector to sidebar
@@ -56,10 +58,9 @@ def main():
             monthly_distribution=default_profile.monthly_distribution
         )
     
-    # Initialize forecast hours and previous value in session state
+    # Initialize forecast hours with default value
     if 'forecast_hours' not in st.session_state:
         st.session_state.forecast_hours = 24
-        st.session_state.previous_forecast_hours = 24
     
     # Layout
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -75,32 +76,33 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             
-            # Add debounced forecast hours selector
+            # Add forecast hours selector with extended range
             forecast_hours = st.slider(
                 "Forecast Hours",
-                min_value=1,
+                min_value=12,
                 max_value=48,
                 value=st.session_state.forecast_hours,
-                help="Select number of hours to forecast (maximum 48 hours)",
-                key="forecast_hours_slider"
+                step=12,
+                help="Select number of hours to forecast (12-48 hours)"
             )
             
-            # Only update if the value has changed significantly (debouncing)
-            if abs(forecast_hours - st.session_state.previous_forecast_hours) >= 2:
+            if forecast_hours != st.session_state.forecast_hours:
                 st.session_state.forecast_hours = forecast_hours
-                st.session_state.previous_forecast_hours = forecast_hours
-                
                 # Clear the cache for the current parameters
                 get_cached_prices.clear()
                 get_cached_optimization.clear()
             
-            # Get cached price forecast and optimization results
-            prices = get_cached_prices(st.session_state.forecast_hours)
-            schedule, predicted_soc, consumption_stats = get_cached_optimization(
-                prices,
-                st.session_state.battery
-            )
-            render_price_chart(prices, schedule, predicted_soc, consumption_stats)
+            try:
+                # Get cached price forecast and optimization results
+                prices = get_cached_prices(forecast_hours)
+                schedule, predicted_soc, consumption_stats = get_cached_optimization(
+                    prices,
+                    st.session_state.battery
+                )
+                render_price_chart(prices, schedule, predicted_soc, consumption_stats)
+            except Exception as e:
+                st.error(f"Error updating price data: {str(e)}")
+                st.info("Please try adjusting the forecast hours or refresh the page.")
 
         with col2:
             st.subheader(get_text("battery_config"))
@@ -114,12 +116,10 @@ def main():
     
     with tab3:
         st.subheader(get_text("historical_analysis"))
-        # Generate 30 days of historical data
         historical_prices = generate_historical_prices(days=30)
         render_historical_analysis(historical_prices, st.session_state.battery)
         
     with tab4:
-        # Generate 30 days of historical data for cost calculations
         historical_prices = generate_historical_prices(days=30)
         render_cost_calculator(historical_prices, st.session_state.battery)
 

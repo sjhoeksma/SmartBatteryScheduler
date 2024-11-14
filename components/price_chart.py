@@ -153,29 +153,45 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
         ))
     
-    # Add SOC prediction with optimized point calculation
-    if predicted_soc is not None:
+    # Add SOC prediction with optimized point calculation and bounds checking
+    if predicted_soc is not None and 'battery' in st.session_state:
+        battery = st.session_state.battery
         timestamps = []
         soc_values = []
         
         # Use fewer interpolation points for longer time periods
         points_per_hour = 4 if len(prices) <= 24 else 2
         
-        for i, ts in enumerate(prices.index[:-1]):
-            base_soc = predicted_soc[i * points_per_hour]
-            next_soc = predicted_soc[(i + 1) * points_per_hour]
+        # Calculate timestamps and SOC values with bounds checking
+        for i in range(len(prices)):
+            start_soc = predicted_soc[i * points_per_hour]
+            # Get next SOC value, using the final value for the last period
+            next_soc = predicted_soc[min((i + 1) * points_per_hour, len(predicted_soc) - 1)]
             
             for j in range(points_per_hour):
-                point_time = ts + timedelta(minutes=(60 // points_per_hour) * j)
+                point_time = prices.index[i] + timedelta(minutes=(60 // points_per_hour) * j)
                 alpha = j / points_per_hour
-                interpolated_soc = base_soc + (next_soc - base_soc) * alpha
+                interpolated_soc = start_soc + (next_soc - start_soc) * alpha
+                
+                # Ensure SOC stays within battery limits
+                bounded_soc = np.clip(
+                    interpolated_soc,
+                    battery.min_soc,
+                    battery.max_soc
+                ) * 100  # Convert to percentage
                 
                 timestamps.append(point_time)
-                soc_values.append(interpolated_soc * 100)
+                soc_values.append(bounded_soc)
         
-        # Add final point
+        # Add final point with proper bounds checking
+        final_soc = np.clip(
+            predicted_soc[-1],
+            battery.min_soc,
+            battery.max_soc
+        ) * 100  # Convert to percentage
+        
         timestamps.append(prices.index[-1])
-        soc_values.append(predicted_soc[-1] * 100)
+        soc_values.append(final_soc)
         
         fig.add_trace(go.Scatter(
             x=timestamps,

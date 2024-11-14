@@ -85,71 +85,76 @@ def optimize_schedule(_prices, _battery):
         # Calculate remaining cycles for current day
         remaining_cycles = _battery.max_daily_cycles - daily_events[current_date]['cycles']
         
-        # Optimize charging/discharging decision
-        if current_soc <= _battery.min_soc:
-            if (current_price <= charge_threshold and 
-                daily_events[current_date]['charge_events'] < _battery.max_charge_events):
-                max_charge = min(
-                    _battery.charge_rate,
-                    _battery.capacity * (_battery.max_soc - current_soc),
-                    remaining_cycles * _battery.capacity
-                )
-                schedule[i] = max_charge
-                daily_events[current_date]['charge_events'] += 1
-                daily_events[current_date]['cycles'] += max_charge / _battery.capacity
-                consumption_impact = 0
-            else:
-                schedule[i] = 0
-                consumption_impact = 0
-        else:
-            consumption_impact = min(
-                home_consumption / _battery.capacity,
-                current_soc - _battery.min_soc
-            ) if current_soc > _battery.min_soc else 0
+        # Initialize schedule value for this period
+        schedule[i] = 0
         
-        # Optimize based on prices if possible
+        # Calculate consumption impact
+        consumption_impact = min(
+            home_consumption / _battery.capacity,
+            current_soc - _battery.min_soc
+        ) if current_soc > _battery.min_soc else 0
+        
+        # Optimize charging/discharging decision with bounds checking
         available_capacity = _battery.capacity * (_battery.max_soc - current_soc)
+        available_discharge = _battery.capacity * (current_soc - _battery.min_soc)
         
-        if remaining_cycles > 0 and available_capacity > 0:
+        if remaining_cycles > 0:
             if (current_price <= charge_threshold and 
-                daily_events[current_date]['charge_events'] < _battery.max_charge_events):
+                daily_events[current_date]['charge_events'] < _battery.max_charge_events and
+                available_capacity > 0):
                 max_allowed_charge = min(
                     _battery.charge_rate,
                     available_capacity,
                     remaining_cycles * _battery.capacity
                 )
                 if max_allowed_charge > 0:
-                    schedule[i] += max_allowed_charge
+                    schedule[i] = max_allowed_charge
                     daily_events[current_date]['charge_events'] += 1
                     daily_events[current_date]['cycles'] += max_allowed_charge / _battery.capacity
             elif (current_price >= discharge_threshold and 
-                  current_soc > _battery.min_soc and 
-                  daily_events[current_date]['discharge_events'] < _battery.max_discharge_events):
+                  daily_events[current_date]['discharge_events'] < _battery.max_discharge_events and
+                  available_discharge > 0):
                 max_allowed_discharge = min(
                     _battery.charge_rate,
-                    _battery.capacity * (current_soc - _battery.min_soc),
+                    available_discharge,
                     remaining_cycles * _battery.capacity
                 )
                 if max_allowed_discharge > 0:
-                    schedule[i] -= max_allowed_discharge
+                    schedule[i] = -max_allowed_discharge
                     daily_events[current_date]['discharge_events'] += 1
                     daily_events[current_date]['cycles'] += max_allowed_discharge / _battery.capacity
         
-        strategic_change = (schedule[i] / _battery.capacity)
+        # Calculate SOC change with bounds checking
+        strategic_change = schedule[i] / _battery.capacity
         total_change = strategic_change - consumption_impact
         
-        # Ensure we never go below min_soc
-        if current_soc + total_change < _battery.min_soc:
+        # Validate SOC bounds
+        next_soc = current_soc + total_change
+        if next_soc < _battery.min_soc:
+            # Adjust change to maintain minimum SOC
             total_change = _battery.min_soc - current_soc
-            schedule[i] = (_battery.min_soc - current_soc + consumption_impact) * _battery.capacity
+            schedule[i] = (total_change + consumption_impact) * _battery.capacity
+        elif next_soc > _battery.max_soc:
+            # Adjust change to maintain maximum SOC
+            total_change = _battery.max_soc - current_soc
+            schedule[i] = (total_change + consumption_impact) * _battery.capacity
         
         # Calculate intermediate points with averaged transitions
         for j in range(4):
             point_index = i * 4 + j + 1
             alpha = (j + 1) / 4
             predicted_soc[point_index] = current_soc + (total_change * alpha)
+            # Ensure intermediate points are within bounds
+            predicted_soc[point_index] = np.clip(
+                predicted_soc[point_index],
+                _battery.min_soc,
+                _battery.max_soc
+            )
         
         # Update current SOC for next hour
         current_soc += total_change
+        
+        # Ensure final SOC is within bounds
+        current_soc = np.clip(current_soc, _battery.min_soc, _battery.max_soc)
     
     return schedule, predicted_soc, consumption_stats
