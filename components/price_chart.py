@@ -98,7 +98,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             x=prices.index,
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
-            line=dict(color="rgba(241, 196, 15, 0.9)", width=2, dash="dot"),
+            line=dict(color="rgba(155, 89, 182, 0.9)", width=3),  # Updated to purple with higher width
             mode='lines',
             yaxis="y3",
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
@@ -139,8 +139,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         ),
         yaxis3=dict(
             title="State of Charge (%)",
-            titlefont=dict(color="rgba(241, 196, 15, 1.0)"),
-            tickfont=dict(color="rgba(241, 196, 15, 1.0)"),
+            titlefont=dict(color="rgba(155, 89, 182, 1.0)"),  # Updated to match line color
+            tickfont=dict(color="rgba(155, 89, 182, 1.0)"),  # Updated to match line color
             anchor="free",
             overlaying="y",
             side="right",
