@@ -2,17 +2,20 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-def get_day_ahead_prices(forecast_days=7):
+def get_day_ahead_prices(forecast_hours=24):
     """
     Get day-ahead energy prices for the Netherlands with extended forecast
     Returns hourly block prices for the available hours
     
     The day-ahead prices are published daily around 13:00 CET for the next day
-    For days beyond tomorrow, prices are forecasted based on historical patterns
+    For hours beyond tomorrow, prices are forecasted based on historical patterns
     
     Args:
-        forecast_days (int): Number of days to forecast prices for (default: 7)
+        forecast_hours (int): Number of hours to forecast prices for (default: 24, max: 48)
     """
+    # Ensure forecast_hours doesn't exceed 48
+    forecast_hours = min(forecast_hours, 48)
+    
     now = datetime.now()
     current_hour = now.replace(minute=0, second=0, microsecond=0)
     publication_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
@@ -21,11 +24,11 @@ def get_day_ahead_prices(forecast_days=7):
     if now >= publication_time:
         # After 13:00, we have tomorrow's prices
         start_date = current_hour
-        end_date = (now + timedelta(days=forecast_days)).replace(hour=23, minute=0, second=0, microsecond=0)
+        end_date = current_hour + timedelta(hours=forecast_hours - 1)
     else:
         # Before 13:00, we only have today's remaining prices plus forecast
         start_date = current_hour
-        end_date = (now + timedelta(days=forecast_days-1)).replace(hour=23, minute=0, second=0, microsecond=0)
+        end_date = current_hour + timedelta(hours=forecast_hours - 1)
     
     dates = pd.date_range(start=start_date, end=end_date, freq='h')
     
@@ -37,10 +40,10 @@ def get_day_ahead_prices(forecast_days=7):
     prices = []
     for date in dates:
         hour = date.hour
-        days_ahead = (date.date() - now.date()).days
+        hours_ahead = (date - now).total_seconds() / 3600
         
-        # Add increasing uncertainty for future days
-        uncertainty_factor = min(0.2 * (days_ahead / forecast_days), 0.2)
+        # Add increasing uncertainty for future hours
+        uncertainty_factor = min(0.2 * (hours_ahead / 48), 0.2)
         
         # Add weekly pattern
         weekly_factor = 1.0 + (0.05 if date.weekday() < 5 else -0.05)
@@ -73,10 +76,10 @@ def get_price_forecast_confidence(date):
     Returns a value between 0 and 1, where 1 is highest confidence
     """
     now = datetime.now()
-    days_ahead = (date.date() - now.date()).days
+    hours_ahead = (date - now).total_seconds() / 3600
     
-    if days_ahead <= 1 and is_prices_available_for_tomorrow():
+    if hours_ahead <= 24 and is_prices_available_for_tomorrow():
         return 1.0  # Actual day-ahead prices
     else:
         # Confidence decreases with forecast distance
-        return max(0.2, 1.0 - (days_ahead * 0.15))  # Minimum 20% confidence
+        return max(0.2, 1.0 - (hours_ahead * 0.02))  # Minimum 20% confidence

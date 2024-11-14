@@ -46,9 +46,9 @@ def main():
             monthly_distribution=default_profile.monthly_distribution
         )
     
-    # Set forecast days in session state if not present
-    if 'forecast_days' not in st.session_state:
-        st.session_state.forecast_days = 7
+    # Set forecast hours in session state if not present
+    if 'forecast_hours' not in st.session_state:
+        st.session_state.forecast_hours = 24
 
     # Layout
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -64,14 +64,18 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             
-            # Add forecast days selector
-            forecast_days = st.slider("Forecast Days", min_value=1, max_value=14, 
-                                    value=st.session_state.forecast_days,
-                                    help="Select number of days to forecast")
-            st.session_state.forecast_days = forecast_days
+            # Add forecast hours selector
+            forecast_hours = st.slider(
+                "Forecast Hours",
+                min_value=1,
+                max_value=48,
+                value=st.session_state.forecast_hours,
+                help="Select number of hours to forecast (maximum 48 hours)"
+            )
+            st.session_state.forecast_hours = forecast_hours
             
             # Get extended price forecast
-            prices = get_day_ahead_prices(forecast_days=forecast_days)
+            prices = get_day_ahead_prices(forecast_hours=forecast_hours)
             schedule, predicted_soc, consumption_stats = optimize_schedule(
                 prices,
                 st.session_state.battery
