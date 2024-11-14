@@ -11,10 +11,10 @@ def get_day_ahead_prices(forecast_hours=24):
     For hours beyond tomorrow, prices are forecasted based on historical patterns.
     
     Args:
-        forecast_hours (int): Number of hours to forecast prices for (12-48 hours)
+        forecast_hours (int): Number of hours to forecast prices for (12-36 hours)
     """
     # Validate and bound forecast hours
-    forecast_hours = max(12, min(forecast_hours, 48))
+    forecast_hours = max(12, min(forecast_hours, 36))
     
     now = datetime.now()
     current_hour = now.replace(minute=0, second=0, microsecond=0)

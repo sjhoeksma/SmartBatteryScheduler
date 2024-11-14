@@ -60,7 +60,7 @@ def main():
     
     # Initialize forecast hours with default value
     if 'forecast_hours' not in st.session_state:
-        st.session_state.forecast_hours = 24
+        st.session_state.forecast_hours = 36
     
     # Layout
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -80,10 +80,10 @@ def main():
             forecast_hours = st.slider(
                 "Forecast Hours",
                 min_value=12,
-                max_value=48,
+                max_value=36,
                 value=st.session_state.forecast_hours,
                 step=12,
-                help="Select number of hours to forecast (12-48 hours)"
+                help="Select number of hours to forecast (12-36 hours)"
             )
             
             if forecast_hours != st.session_state.forecast_hours:
