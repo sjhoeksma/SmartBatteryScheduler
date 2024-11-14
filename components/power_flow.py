@@ -72,10 +72,14 @@ def render_power_flow(battery):
             # Battery metrics
             with cols[1]:
                 if battery_power > 0:
+                    charging_message = (
+                        get_text("charging") if battery.current_soc > battery.min_soc
+                        else "Charging (Min SOC)"
+                    )
                     st.metric(
                         f"{get_text('battery_power')} {get_flow_direction(battery_power)}", 
                         f"{battery_power:.1f} kW",
-                        delta=get_text("charging")
+                        delta=charging_message
                     )
                 elif battery_power < 0:
                     if home_discharge > 0:
@@ -84,11 +88,22 @@ def render_power_flow(battery):
                             f"{home_discharge:.1f} kW",
                             delta=get_text("discharge_to_home")
                         )
+                    if grid_discharge > 0:
+                        st.metric(
+                            f"{get_text('grid_discharge')} {get_flow_direction(-grid_discharge)}", 
+                            f"{grid_discharge:.1f} kW",
+                            delta=get_text("discharge_to_grid")
+                        )
                 
-                # Add battery charge level
+                # Add battery charge level with warning when at minimum
+                charge_text = (
+                    f"🔋 {battery.current_soc*100:.1f}% (Min SOC)"
+                    if battery.current_soc <= battery.min_soc
+                    else f"🔋 {battery.current_soc*100:.1f}%"
+                )
                 st.progress(
                     value=battery.current_soc,
-                    text=f"🔋 {battery.current_soc*100:.1f}%"
+                    text=charge_text
                 )
             
             # Home consumption metrics
@@ -105,18 +120,22 @@ def render_power_flow(battery):
             # Show power flow status with emojis and separated discharge flows
             status_messages = []
             
-            # Grid to home flow
-            if net_grid_consumption > 0:
-                status_messages.append("⚡ Grid → 🏠 Home")
-            
-            # Battery flows
-            if battery_power > 0:
-                status_messages.append("⚡ Grid → 🔋 Battery")
-            elif battery_power < 0:
-                if home_discharge > 0:
-                    status_messages.append("🔋 Battery → 🏠 Home")
-                if grid_discharge > 0:
-                    status_messages.append("🔋 Battery → ⚡ Grid")
+            # Check for minimum SOC charging first
+            if battery.current_soc <= battery.min_soc:
+                status_messages.append("⚡ Grid → 🔋 Battery (Charging at Min SOC)")
+            else:
+                # Normal flow messages
+                if net_grid_consumption > 0:
+                    status_messages.append("⚡ Grid → 🏠 Home")
+                
+                # Battery flows
+                if battery_power > 0:
+                    status_messages.append("⚡ Grid → 🔋 Battery")
+                elif battery_power < 0:
+                    if home_discharge > 0:
+                        status_messages.append("🔋 Battery → 🏠 Home")
+                    if grid_discharge > 0:
+                        status_messages.append("🔋 Battery → ⚡ Grid")
             
             # Default message if no active flows
             if not status_messages:

@@ -147,7 +147,10 @@ class Battery:
         hour = datetime.now().hour
         consumption = self.get_hourly_consumption(hour)
         
-        if self.current_soc < 0.3:
+        # Prioritize charging when at minimum SOC
+        if self.current_soc <= self.min_soc:
+            return min(self.charge_rate, self.capacity * (self.max_soc - self.current_soc))
+        elif self.current_soc < 0.3:  # Low SOC condition
             return min(self.charge_rate, self.get_available_capacity())
         elif self.current_soc > 0.8:
             return -min(self.charge_rate, consumption)
