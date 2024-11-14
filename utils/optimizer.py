@@ -24,6 +24,9 @@ def optimize_schedule(prices, battery):
     predicted_soc = np.zeros(periods * 4 + 1)
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
+    # Initialize with current date
+    last_date = prices.index[0].date() if len(prices) > 0 else None
+    
     # Calculate price thresholds for decision making
     effective_prices = pd.Series([
         battery.get_effective_price(price, date.hour)
@@ -31,8 +34,8 @@ def optimize_schedule(prices, battery):
     ])
     median_price = np.median(effective_prices)
     price_std = np.std(effective_prices)
-    charge_threshold = median_price - 0.25 * price_std  # Changed from 0.5 to 0.25
-    discharge_threshold = median_price + 0.25 * price_std  # Changed from 0.5 to 0.25
+    charge_threshold = median_price - 0.25 * price_std
+    discharge_threshold = median_price + 0.25 * price_std
     
     # Start with current battery SOC
     current_soc = battery.current_soc
@@ -42,20 +45,21 @@ def optimize_schedule(prices, battery):
     charge_events = 0
     discharge_events = 0
     daily_cycles = 0.0
-    last_date = None
     
     # Process each period
     for i in range(periods):
         current_price = effective_prices.iloc[i]
         current_datetime = prices.index[i]
+        current_date = current_datetime.date()
         hour = current_datetime.hour if isinstance(current_datetime, pd.Timestamp) else datetime.now().hour
         
         # Reset counters on new day
-        if last_date is None or current_datetime.date() > last_date:
+        if last_date is None or current_date > last_date:
             charge_events = 0
             discharge_events = 0
             daily_cycles = 0.0
-            last_date = current_datetime.date()
+            last_date = current_date
+            print(f"Reset counters for new day: {current_date}")  # Debug log
         
         # Calculate home consumption for this hour with seasonal adjustment
         home_consumption = battery.get_hourly_consumption(hour, current_datetime)
