@@ -16,7 +16,8 @@ class BatteryProfile:
     monthly_distribution: Dict[int, float] = None  # Monthly consumption distribution factors
     surcharge_rate: float = 0.05  # Default surcharge rate in €/kWh
     max_daily_cycles: float = 1.5  # Default maximum daily cycles
-    min_daily_cycles: float = 0.5  # Default minimum daily cycles
+    max_charge_events: int = 2  # Default max charging events per day
+    max_discharge_events: int = 1  # Default max discharging events per day
     
     def __post_init__(self):
         if self.monthly_distribution is None:
@@ -65,7 +66,8 @@ class BatteryProfileManager:
                 yearly_consumption=5475.0,
                 surcharge_rate=0.05,
                 max_daily_cycles=1.5,
-                min_daily_cycles=0.5
+                max_charge_events=2,
+                max_discharge_events=1
             ),
             "EV Battery": BatteryProfile(
                 name="EV Battery",
@@ -78,7 +80,8 @@ class BatteryProfileManager:
                 yearly_consumption=7300.0,
                 surcharge_rate=0.08,
                 max_daily_cycles=1.0,
-                min_daily_cycles=0.3
+                max_charge_events=1,
+                max_discharge_events=1
             ),
             "Small Battery": BatteryProfile(
                 name="Small Battery",
@@ -91,7 +94,8 @@ class BatteryProfileManager:
                 yearly_consumption=2920.0,
                 surcharge_rate=0.05,
                 max_daily_cycles=2.0,
-                min_daily_cycles=0.8
+                max_charge_events=3,
+                max_discharge_events=2
             )
         }
         self.profiles.update(defaults)

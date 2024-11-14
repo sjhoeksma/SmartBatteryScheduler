@@ -22,7 +22,7 @@ def render_monthly_distribution(monthly_distribution):
         xaxis_title=get_text("month"),
         yaxis_title=get_text("consumption_factor"),
         xaxis=dict(tickmode='array', ticktext=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                   tickvals=months)
     )
     return fig
@@ -110,27 +110,37 @@ def render_battery_config():
                 format="%.3f",
                 help="Additional cost applied to energy prices"
             )
-            
-            st.markdown(f"### {get_text('cycle_limits')}")
-            st.info(get_text('cycle_limits_help'))
-            
-            min_daily_cycles = st.number_input(
-                get_text("min_daily_cycles"),
-                min_value=0.1,
-                max_value=5.0,
-                value=float(profile.min_daily_cycles if profile else st.session_state.battery.min_daily_cycles),
-                step=0.1,
-                format="%.1f"
-            )
-            
-            max_daily_cycles = st.number_input(
-                get_text("max_daily_cycles"),
-                min_value=min_daily_cycles,
-                max_value=5.0,
-                value=float(profile.max_daily_cycles if profile else st.session_state.battery.max_daily_cycles),
-                step=0.1,
-                format="%.1f"
-            )
+        
+        # Cycle and Event Limits Section
+        st.markdown("### Event Limits")
+        st.info(get_text('cycle_limits_help'))
+        
+        # Add maximum daily cycles input
+        max_daily_cycles = st.number_input(
+            get_text("max_daily_cycles"),
+            min_value=0.1,
+            max_value=5.0,
+            value=float(profile.max_daily_cycles if profile else st.session_state.battery.max_daily_cycles),
+            step=0.1,
+            format="%.1f"
+        )
+        
+        # Add event limits inputs sequentially
+        max_charge_events = st.number_input(
+            "Maximum Daily Charge Events",
+            min_value=1,
+            max_value=10,
+            value=int(profile.max_charge_events if profile else st.session_state.battery.max_charge_events),
+            help="Maximum number of times the battery can start charging per day"
+        )
+        
+        max_discharge_events = st.number_input(
+            "Maximum Daily Discharge Events",
+            min_value=1,
+            max_value=10,
+            value=int(profile.max_discharge_events if profile else st.session_state.battery.max_discharge_events),
+            help="Maximum number of times the battery can start discharging per day"
+        )
         
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(
@@ -150,8 +160,9 @@ def render_battery_config():
                 yearly_consumption=yearly_consumption,
                 monthly_distribution=profile.monthly_distribution if profile else None,
                 surcharge_rate=round(surcharge_rate, 3),
-                min_daily_cycles=min_daily_cycles,
-                max_daily_cycles=max_daily_cycles
+                max_daily_cycles=max_daily_cycles,
+                max_charge_events=max_charge_events,
+                max_discharge_events=max_discharge_events
             )
             st.success(get_text("config_updated"))
     
@@ -172,8 +183,9 @@ def render_battery_config():
                     yearly_consumption=st.session_state.battery.yearly_consumption,
                     monthly_distribution=st.session_state.battery.monthly_distribution,
                     surcharge_rate=round(st.session_state.battery.surcharge_rate, 3),
-                    min_daily_cycles=st.session_state.battery.min_daily_cycles,
-                    max_daily_cycles=st.session_state.battery.max_daily_cycles
+                    max_daily_cycles=st.session_state.battery.max_daily_cycles,
+                    max_charge_events=st.session_state.battery.max_charge_events,
+                    max_discharge_events=st.session_state.battery.max_discharge_events
                 )
                 st.session_state.profile_manager.add_profile(new_profile)
                 st.success(get_text("profile_created").format(new_name))

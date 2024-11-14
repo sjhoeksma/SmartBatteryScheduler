@@ -21,7 +21,6 @@ def optimize_schedule(prices, battery):
     """
     periods = len(prices)
     schedule = np.zeros(periods)
-    # Create array for intermediate points (4 points per hour)
     predicted_soc = np.zeros(periods * 4 + 1)
     consumption_stats = analyze_consumption_patterns(battery, prices.index)
     
@@ -39,11 +38,24 @@ def optimize_schedule(prices, battery):
     current_soc = battery.current_soc
     predicted_soc[0] = current_soc
     
+    # Track charge/discharge events
+    charge_events = 0
+    discharge_events = 0
+    daily_cycles = 0.0
+    last_date = None
+    
     # Process each period
     for i in range(periods):
         current_price = effective_prices.iloc[i]
         current_datetime = prices.index[i]
         hour = current_datetime.hour if isinstance(current_datetime, pd.Timestamp) else datetime.now().hour
+        
+        # Reset counters on new day
+        if last_date is None or current_datetime.date() > last_date:
+            charge_events = 0
+            discharge_events = 0
+            daily_cycles = 0.0
+        last_date = current_datetime.date()
         
         # Calculate home consumption for this hour with seasonal adjustment
         home_consumption = battery.get_hourly_consumption(hour, current_datetime)
@@ -53,6 +65,7 @@ def optimize_schedule(prices, battery):
         available_energy = battery.capacity * (current_soc - battery.min_soc)
         
         # First, handle home consumption
+        consumption_change = 0
         if available_energy >= home_consumption:
             # Can supply home consumption from battery
             schedule[i] = -home_consumption
@@ -60,28 +73,43 @@ def optimize_schedule(prices, battery):
         else:
             # Need to charge to meet home consumption
             needed_charge = home_consumption - available_energy
-            if battery.can_charge(needed_charge):
+            if battery.can_charge(needed_charge) and charge_events < battery.max_charge_events:
                 schedule[i] = needed_charge
                 consumption_change = -needed_charge / battery.capacity
-            else:
-                consumption_change = 0
-
-        # Then optimize based on prices
-        if current_price <= charge_threshold and available_capacity > 0:
-            # Charge during low price periods
-            charge_amount = min(battery.charge_rate, available_capacity)
-            schedule[i] += charge_amount
-            charge_change = charge_amount / battery.capacity
-        elif current_price >= discharge_threshold and available_energy > 0:
-            # Discharge during high price periods
-            discharge_amount = min(battery.charge_rate, available_energy)
-            schedule[i] -= discharge_amount
-            charge_change = -discharge_amount / battery.capacity
-        else:
-            charge_change = 0
-
+                charge_events += 1
+        
+        # Track cycles from consumption
+        daily_cycles += abs(consumption_change)
+        
+        # Then optimize based on prices if we haven't exceeded event limits
+        remaining_cycles = battery.max_daily_cycles - daily_cycles
+        if remaining_cycles > 0:
+            if current_price <= charge_threshold and available_capacity > 0 and charge_events < battery.max_charge_events:
+                # Charge during low price periods
+                max_allowed_charge = min(
+                    battery.charge_rate,
+                    available_capacity,
+                    remaining_cycles * battery.capacity
+                )
+                if max_allowed_charge > 0:
+                    schedule[i] += max_allowed_charge
+                    charge_events += 1
+                    daily_cycles += max_allowed_charge / battery.capacity
+                    
+            elif current_price >= discharge_threshold and available_energy > 0 and discharge_events < battery.max_discharge_events:
+                # Discharge during high price periods
+                max_allowed_discharge = min(
+                    battery.charge_rate,
+                    available_energy,
+                    remaining_cycles * battery.capacity
+                )
+                if max_allowed_discharge > 0:
+                    schedule[i] -= max_allowed_discharge
+                    discharge_events += 1
+                    daily_cycles += max_allowed_discharge / battery.capacity
+        
         # Calculate total SOC change for this hour
-        total_change = charge_change - consumption_change
+        total_change = (schedule[i] / battery.capacity)
         
         # Calculate intermediate points with averaged transitions
         for j in range(4):
