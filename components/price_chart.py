@@ -18,6 +18,10 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     shoulder_color = "rgba(255, 165, 0, 0.7)"  # Orange
     offpeak_color = "rgba(60, 179, 113, 0.7)"  # Medium sea green
     
+    # Define updated colors for charging/discharging
+    charging_color = "rgba(46, 204, 113, 0.8)"  # Emerald green with opacity
+    discharging_color = "rgba(231, 76, 60, 0.8)"  # Pomegranate red with opacity
+    
     # Determine price period colors
     colors = []
     for idx in prices.index:
@@ -55,7 +59,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             x=prices.index,
             y=home_usage,
             name="Home Usage",
-            line=dict(color="black", width=2),
+            line=dict(color="rgba(52, 73, 94, 0.9)", width=2),  # Updated to darker color
             mode='lines',
             hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
         ))
@@ -72,7 +76,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
                 x=prices.index[charge_mask],
                 y=schedule[charge_mask],
                 name="Charging",
-                marker_color="green",
+                marker_color=charging_color,
                 width=3600000,  # 1 hour in milliseconds
                 hovertemplate="Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"
             ))
@@ -83,7 +87,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
                 x=prices.index[discharge_mask],
                 y=schedule[discharge_mask],
                 name="Discharging",
-                marker_color="red",
+                marker_color=discharging_color,
                 width=3600000,  # 1 hour in milliseconds
                 hovertemplate="Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
             ))
@@ -94,7 +98,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             x=prices.index,
             y=predicted_soc * 100,  # Convert to percentage
             name="Predicted SOC",
-            line=dict(color="orange", width=2, dash="dot"),
+            line=dict(color="rgba(241, 196, 15, 0.9)", width=2, dash="dot"),  # Updated to sunflower yellow
             mode='lines',
             yaxis="y3",
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
@@ -119,15 +123,15 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         ),
         yaxis=dict(
             title="Power (kW)",
-            titlefont=dict(color="black"),
-            tickfont=dict(color="black"),
+            titlefont=dict(color="rgba(52, 73, 94, 1.0)"),  # Updated to match home usage
+            tickfont=dict(color="rgba(52, 73, 94, 1.0)"),
             gridcolor="rgba(128, 128, 128, 0.2)",
             zerolinecolor="rgba(128, 128, 128, 0.2)"
         ),
         yaxis2=dict(
             title="Price (€/kWh)",
-            titlefont=dict(color="blue"),
-            tickfont=dict(color="blue"),
+            titlefont=dict(color="rgba(41, 128, 185, 1.0)"),  # Updated to darker blue
+            tickfont=dict(color="rgba(41, 128, 185, 1.0)"),
             anchor="x",
             overlaying="y",
             side="right",
@@ -135,8 +139,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         ),
         yaxis3=dict(
             title="State of Charge (%)",
-            titlefont=dict(color="orange"),
-            tickfont=dict(color="orange"),
+            titlefont=dict(color="rgba(241, 196, 15, 1.0)"),  # Updated to match SOC line
+            tickfont=dict(color="rgba(241, 196, 15, 1.0)"),
             anchor="free",
             overlaying="y",
             side="right",
@@ -174,6 +178,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     st.info("""
     📈 **Usage Pattern Information**
     - The black line shows actual home usage including hourly variations
-    - Green bars indicate charging periods, red bars indicate discharging
+    - Green bars indicate charging periods (buying energy)
+    - Red bars indicate discharging periods (using stored energy)
     - Energy prices are shown as hourly blocks to reflect actual market trading periods
     """)
