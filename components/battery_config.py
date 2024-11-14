@@ -110,6 +110,27 @@ def render_battery_config():
                 format="%.3f",
                 help="Additional cost applied to energy prices"
             )
+            
+            st.markdown(f"### {get_text('cycle_limits')}")
+            st.info(get_text('cycle_limits_help'))
+            
+            min_daily_cycles = st.number_input(
+                get_text("min_daily_cycles"),
+                min_value=0.1,
+                max_value=5.0,
+                value=float(profile.min_daily_cycles if profile else st.session_state.battery.min_daily_cycles),
+                step=0.1,
+                format="%.1f"
+            )
+            
+            max_daily_cycles = st.number_input(
+                get_text("max_daily_cycles"),
+                min_value=min_daily_cycles,
+                max_value=5.0,
+                value=float(profile.max_daily_cycles if profile else st.session_state.battery.max_daily_cycles),
+                step=0.1,
+                format="%.1f"
+            )
         
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(
@@ -128,7 +149,9 @@ def render_battery_config():
                 usage_pattern=usage_pattern,
                 yearly_consumption=yearly_consumption,
                 monthly_distribution=profile.monthly_distribution if profile else None,
-                surcharge_rate=round(surcharge_rate, 3)
+                surcharge_rate=round(surcharge_rate, 3),
+                min_daily_cycles=min_daily_cycles,
+                max_daily_cycles=max_daily_cycles
             )
             st.success(get_text("config_updated"))
     
@@ -148,7 +171,9 @@ def render_battery_config():
                     usage_pattern=st.session_state.battery.usage_pattern,
                     yearly_consumption=st.session_state.battery.yearly_consumption,
                     monthly_distribution=st.session_state.battery.monthly_distribution,
-                    surcharge_rate=round(st.session_state.battery.surcharge_rate, 3)
+                    surcharge_rate=round(st.session_state.battery.surcharge_rate, 3),
+                    min_daily_cycles=st.session_state.battery.min_daily_cycles,
+                    max_daily_cycles=st.session_state.battery.max_daily_cycles
                 )
                 st.session_state.profile_manager.add_profile(new_profile)
                 st.success(get_text("profile_created").format(new_name))

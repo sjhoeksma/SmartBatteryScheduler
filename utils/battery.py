@@ -5,7 +5,8 @@ from utils.ecactus_client import get_ecactus_client
 class Battery:
     def __init__(self, capacity, min_soc, max_soc, charge_rate, profile_name=None, 
                  daily_consumption=15.0, usage_pattern="Flat", yearly_consumption=5475.0,
-                 monthly_distribution=None, surcharge_rate=0.050):
+                 monthly_distribution=None, surcharge_rate=0.050, 
+                 min_daily_cycles=0.5, max_daily_cycles=1.5):
         self.capacity = capacity
         self.min_soc = min_soc
         self.max_soc = max_soc
@@ -20,7 +21,11 @@ class Battery:
             7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
         }
         self.surcharge_rate = round(float(surcharge_rate), 3)
+        self.min_daily_cycles = min_daily_cycles
+        self.max_daily_cycles = max_daily_cycles
         self._current_power = 0.0
+        self._daily_cycles = 0.0
+        self._last_cycle_reset = datetime.now().date()
         try:
             self.ecactus_client = get_ecactus_client()
         except ValueError:
@@ -74,34 +79,38 @@ class Battery:
         return (self.current_soc - (amount / self.capacity)) >= self.min_soc
     
     def charge(self, amount):
-        if self.can_charge(amount):
+        if self.can_charge(amount) and self.can_complete_cycles(amount):
             if self.ecactus_client:
                 success = self.ecactus_client.update_battery_settings({
                     'charge_power': amount,
                     'mode': 'charge'
                 })
                 if success:
+                    self._update_cycles(amount)
                     self._update_from_api()
                     return True
             else:
                 self.current_soc += amount / self.capacity
                 self._current_power = amount
+                self._update_cycles(amount)
                 return True
         return False
     
     def discharge(self, amount):
-        if self.can_discharge(amount):
+        if self.can_discharge(amount) and self.can_complete_cycles(-amount):
             if self.ecactus_client:
                 success = self.ecactus_client.update_battery_settings({
                     'discharge_power': amount,
                     'mode': 'discharge'
                 })
                 if success:
+                    self._update_cycles(-amount)
                     self._update_from_api()
                     return True
             else:
                 self.current_soc -= amount / self.capacity
                 self._current_power = -amount
+                self._update_cycles(-amount)
                 return True
         return False
 
@@ -170,3 +179,27 @@ class Battery:
     def get_effective_price(self, base_price: float, hour: int) -> float:
         """Calculate effective price including surcharge"""
         return round(base_price + self.surcharge_rate, 3)
+
+    def _reset_daily_cycles_if_needed(self):
+        """Reset daily cycles counter if it's a new day"""
+        current_date = datetime.now().date()
+        if current_date > self._last_cycle_reset:
+            self._daily_cycles = 0.0
+            self._last_cycle_reset = current_date
+
+    def _update_cycles(self, energy_amount):
+        """Update the daily cycles counter"""
+        self._reset_daily_cycles_if_needed()
+        cycle_fraction = abs(energy_amount) / self.capacity
+        self._daily_cycles += cycle_fraction
+
+    def can_complete_cycles(self, energy_amount):
+        """Check if the operation would exceed daily cycle limits"""
+        self._reset_daily_cycles_if_needed()
+        new_cycles = self._daily_cycles + (abs(energy_amount) / self.capacity)
+        return self.min_daily_cycles <= new_cycles <= self.max_daily_cycles
+
+    def get_remaining_cycles(self):
+        """Get remaining available cycles for the day"""
+        self._reset_daily_cycles_if_needed()
+        return self.max_daily_cycles - self._daily_cycles

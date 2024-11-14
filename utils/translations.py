@@ -370,6 +370,22 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Consuming",
         nl="Verbruikend"
     ),
+    "max_daily_cycles": Translation(
+        en="Maximum Daily Cycles",
+        nl="Maximale Dagelijkse Cycli"
+    ),
+    "min_daily_cycles": Translation(
+        en="Minimum Daily Cycles",
+        nl="Minimale Dagelijkse Cycli"
+    ),
+    "cycle_limits": Translation(
+        en="Cycle Limits",
+        nl="Cyclusbeperkingen"
+    ),
+    "cycle_limits_help": Translation(
+        en="Set the minimum and maximum number of charge/discharge cycles per day",
+        nl="Stel het minimum en maximum aantal laad/ontlaadcycli per dag in"
+    ),
 }
 
 def get_browser_language() -> str:
