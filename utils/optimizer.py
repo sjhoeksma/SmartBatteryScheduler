@@ -62,33 +62,36 @@ def optimize_schedule(prices, battery):
         
         # Handle home consumption with proper min_soc check
         if current_soc <= battery.min_soc:
-            # At minimum SOC, all consumption comes from grid
-            schedule[i] = 0  # No battery activity
-            consumption_change = 0  # No SOC change from consumption
-        elif current_soc - (home_consumption / battery.capacity) >= battery.min_soc:
-            # Can safely supply home consumption from battery
-            schedule[i] = -home_consumption
-            consumption_change = home_consumption / battery.capacity
+            # At minimum SOC, prioritize charging if price is favorable
+            if current_price <= charge_threshold and charge_events < battery.max_charge_events:
+                max_charge = min(
+                    battery.charge_rate,
+                    battery.capacity * (battery.max_soc - current_soc),
+                    remaining_cycles * battery.capacity
+                )
+                schedule[i] = max_charge
+                charge_events += 1
+                daily_cycles += max_charge / battery.capacity
+                consumption_change = 0  # Grid supplies consumption
+            else:
+                schedule[i] = 0  # No battery activity
+                consumption_change = 0  # Grid supplies consumption
         else:
-            # Can only discharge until min_soc, then grid takes over
-            available_discharge = (current_soc - battery.min_soc) * battery.capacity
-            if available_discharge > 0:
+            # Normal operation when above min_soc
+            if current_soc - (home_consumption / battery.capacity) >= battery.min_soc:
+                schedule[i] = -home_consumption
+                consumption_change = home_consumption / battery.capacity
+            else:
+                available_discharge = (current_soc - battery.min_soc) * battery.capacity
                 schedule[i] = -available_discharge
                 consumption_change = available_discharge / battery.capacity
-            else:
-                schedule[i] = 0
-                consumption_change = 0
-        
-        # Track cycles from consumption
-        daily_cycles += abs(consumption_change)
-        
-        # Calculate available capacity for charging
-        available_capacity = battery.capacity * (battery.max_soc - current_soc)
-        
+
         # Then optimize based on prices if we haven't exceeded event limits
         remaining_cycles = battery.max_daily_cycles - daily_cycles
-        if remaining_cycles > 0 and current_soc > battery.min_soc:
-            if current_price <= charge_threshold and available_capacity > 0 and charge_events < battery.max_charge_events:
+        available_capacity = battery.capacity * (battery.max_soc - current_soc)
+
+        if remaining_cycles > 0 and available_capacity > 0:
+            if current_price <= charge_threshold and charge_events < battery.max_charge_events:
                 # Charge during low price periods
                 max_allowed_charge = min(
                     battery.charge_rate,
@@ -99,9 +102,8 @@ def optimize_schedule(prices, battery):
                     schedule[i] += max_allowed_charge
                     charge_events += 1
                     daily_cycles += max_allowed_charge / battery.capacity
-                    
-            elif current_price >= discharge_threshold and discharge_events < battery.max_discharge_events:
-                # Discharge during high price periods with min_soc constraint
+            elif current_price >= discharge_threshold and current_soc > battery.min_soc and discharge_events < battery.max_discharge_events:
+                # Only discharge if above min_soc
                 max_allowed_discharge = min(
                     battery.charge_rate,
                     battery.capacity * (current_soc - battery.min_soc),
