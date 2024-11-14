@@ -33,15 +33,21 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         else:  # Off-peak hours
             colors.append(offpeak_color)
     
-    # Add price bars first (bottom layer)
+    # Add price bars with confidence-based opacity
+    prices_with_confidence = pd.Series([
+        price * get_price_forecast_confidence(date)
+        for price, date in zip(prices.values, prices.index)
+    ], index=prices.index)
+
     fig.add_trace(go.Bar(
         x=prices.index,
         y=prices.values,
         name="Energy Price",
         marker_color=colors,
+        marker_opacity=[get_price_forecast_confidence(date) for date in prices.index],
         yaxis="y2",
         width=3600000,  # 1 hour in milliseconds for block width
-        hovertemplate="Time: %{x}<br>Price: €%{y:.3f}/kWh<extra></extra>"
+        hovertemplate="Time: %{x}<br>Price: €%{y:.3f}/kWh<br>Confidence: %{marker.opacity:.0%}<extra></extra>"
     ))
     
     # Load strategy visualization (middle layer)
@@ -203,3 +209,11 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     - Energy prices are shown as hourly blocks with reduced opacity to highlight charging patterns
     - Purple line shows predicted battery State of Charge (SOC) with smooth transitions
     """)
+
+def get_price_forecast_confidence(date):
+    """Dummy function for demonstration purposes - replace with actual confidence calculation"""
+    # Example: Higher confidence for hours closer to the current time
+    current_time = datetime.now()
+    time_diff = (date - current_time).total_seconds() / 3600  # Difference in hours
+    confidence = 1 - abs(time_diff) / 24  # Confidence decreases linearly with time difference
+    return max(0, min(1, confidence))  # Ensure confidence is between 0 and 1
