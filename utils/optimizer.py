@@ -62,33 +62,22 @@ def optimize_schedule(prices, battery):
         
         # Handle home consumption with proper min_soc check
         if current_soc <= battery.min_soc:
-            # Battery is at minimum SOC, need to charge
-            needed_charge = min(
-                battery.charge_rate,
-                battery.capacity * (battery.max_soc - current_soc),
-                home_consumption + (battery.capacity * 0.1)  # Add 10% buffer
-            )
-            if charge_events < battery.max_charge_events:
-                schedule[i] = needed_charge
-                charge_events += 1
-                consumption_change = -needed_charge / battery.capacity
+            # At minimum SOC, all consumption comes from grid
+            schedule[i] = 0  # No battery activity
+            consumption_change = 0  # No SOC change from consumption
         elif current_soc - (home_consumption / battery.capacity) >= battery.min_soc:
             # Can safely supply home consumption from battery
             schedule[i] = -home_consumption
             consumption_change = home_consumption / battery.capacity
         else:
-            # Can only discharge until min_soc, need to charge for the rest
+            # Can only discharge until min_soc, then grid takes over
             available_discharge = (current_soc - battery.min_soc) * battery.capacity
-            needed_charge = home_consumption - available_discharge
-            
             if available_discharge > 0:
                 schedule[i] = -available_discharge
                 consumption_change = available_discharge / battery.capacity
-            
-            if needed_charge > 0 and charge_events < battery.max_charge_events:
-                schedule[i] += needed_charge
-                charge_events += 1
-                consumption_change -= needed_charge / battery.capacity
+            else:
+                schedule[i] = 0
+                consumption_change = 0
         
         # Track cycles from consumption
         daily_cycles += abs(consumption_change)

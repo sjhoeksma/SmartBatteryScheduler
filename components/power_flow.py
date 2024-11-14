@@ -42,13 +42,19 @@ def render_power_flow(battery):
         # Initial values
         grid_power, home_consumption, battery_power = update_power_values()
         
-        # Calculate separated discharge values
-        total_discharge = abs(min(battery_power, 0))
-        home_discharge = min(total_discharge, home_consumption)
-        grid_discharge = max(0, total_discharge - home_consumption)
-        
-        # Calculate actual grid consumption (excluding battery discharge to grid)
-        net_grid_consumption = max(0, grid_power - grid_discharge)
+        # Handle power flows differently when battery is at minimum SOC
+        if battery.current_soc <= battery.min_soc:
+            # All home consumption comes from grid
+            net_grid_consumption = home_consumption
+            home_discharge = 0
+            grid_discharge = 0
+        else:
+            # Calculate separated discharge values
+            total_discharge = abs(min(battery_power, 0))
+            home_discharge = min(total_discharge, home_consumption)
+            grid_discharge = max(0, total_discharge - home_consumption)
+            # Calculate actual grid consumption (excluding battery discharge to grid)
+            net_grid_consumption = max(0, home_consumption - home_discharge)
         
         with display_container.container():
             # Display power flow metrics in three columns
@@ -62,7 +68,7 @@ def render_power_flow(battery):
                         f"{net_grid_consumption:.1f} kW",
                         delta=get_text("supply")
                     )
-                if grid_discharge > 0:
+                if grid_discharge > 0 and battery.current_soc > battery.min_soc:
                     st.metric(
                         f"{get_text('grid_discharge')} {get_flow_direction(-grid_discharge)}", 
                         f"{grid_discharge:.1f} kW",
@@ -71,31 +77,7 @@ def render_power_flow(battery):
             
             # Battery metrics
             with cols[1]:
-                if battery_power > 0:
-                    charging_message = (
-                        get_text("charging") if battery.current_soc > battery.min_soc
-                        else "Charging (Min SOC)"
-                    )
-                    st.metric(
-                        f"{get_text('battery_power')} {get_flow_direction(battery_power)}", 
-                        f"{battery_power:.1f} kW",
-                        delta=charging_message
-                    )
-                elif battery_power < 0:
-                    if home_discharge > 0:
-                        st.metric(
-                            f"{get_text('home_discharge')} {get_flow_direction(-home_discharge)}", 
-                            f"{home_discharge:.1f} kW",
-                            delta=get_text("discharge_to_home")
-                        )
-                    if grid_discharge > 0:
-                        st.metric(
-                            f"{get_text('grid_discharge')} {get_flow_direction(-grid_discharge)}", 
-                            f"{grid_discharge:.1f} kW",
-                            delta=get_text("discharge_to_grid")
-                        )
-                
-                # Add battery charge level with warning when at minimum
+                # Show battery status based on SOC
                 charge_text = (
                     f"🔋 {battery.current_soc*100:.1f}% (Min SOC)"
                     if battery.current_soc <= battery.min_soc
@@ -105,6 +87,28 @@ def render_power_flow(battery):
                     value=battery.current_soc,
                     text=charge_text
                 )
+                
+                # Only show battery power metrics if not at minimum SOC
+                if battery.current_soc > battery.min_soc:
+                    if battery_power > 0:
+                        st.metric(
+                            f"{get_text('battery_power')} {get_flow_direction(battery_power)}", 
+                            f"{battery_power:.1f} kW",
+                            delta=get_text("charging")
+                        )
+                    elif battery_power < 0:
+                        if home_discharge > 0:
+                            st.metric(
+                                f"{get_text('home_discharge')} {get_flow_direction(-home_discharge)}", 
+                                f"{home_discharge:.1f} kW",
+                                delta=get_text("discharge_to_home")
+                            )
+                        if grid_discharge > 0:
+                            st.metric(
+                                f"{get_text('grid_discharge')} {get_flow_direction(-grid_discharge)}", 
+                                f"{grid_discharge:.1f} kW",
+                                delta=get_text("discharge_to_grid")
+                            )
             
             # Home consumption metrics
             with cols[2]:
@@ -117,18 +121,16 @@ def render_power_flow(battery):
             # Display flow information
             st.markdown("### " + get_text("power_flow_status"))
             
-            # Show power flow status with emojis and separated discharge flows
+            # Show power flow status with emojis
             status_messages = []
             
-            # Check for minimum SOC charging first
+            # Different status messages based on battery SOC
             if battery.current_soc <= battery.min_soc:
-                status_messages.append("⚡ Grid → 🔋 Battery (Charging at Min SOC)")
+                status_messages.append("⚡ Grid → 🏠 Home (Battery at Min SOC)")
             else:
-                # Normal flow messages
                 if net_grid_consumption > 0:
                     status_messages.append("⚡ Grid → 🏠 Home")
                 
-                # Battery flows
                 if battery_power > 0:
                     status_messages.append("⚡ Grid → 🔋 Battery")
                 elif battery_power < 0:
