@@ -118,24 +118,38 @@ class Battery:
         return yearly_daily_avg * seasonal_factor
 
     def get_hourly_consumption(self, hour, date=None):
-        """Calculate hourly consumption based on usage pattern and seasonal factors"""
+        """Calculate hourly consumption based on usage pattern, weekday/weekend, and seasonal factors"""
         if date is None:
             date = datetime.now()
             
-        daily = self.get_daily_consumption_for_date(date) / 24.0  # Base hourly consumption
+        daily = self.get_daily_consumption_for_date(date) / 24.0  # Base hourly
+        is_weekend = date.weekday() >= 5
         
-        # Apply hourly pattern adjustments
-        if self.usage_pattern == "Flat":
-            return daily
-        elif self.usage_pattern == "Day-heavy":
-            if 7 <= hour < 23:  # Daytime hours
+        # Weekday patterns
+        if not is_weekend:
+            # Morning peak (7-9 AM)
+            if 7 <= hour <= 9:
+                return daily * 2.0
+            # Evening peak (17-22)
+            elif 17 <= hour <= 22:
+                return daily * 2.5
+            # Night/work hours
+            elif 0 <= hour <= 6:
+                return daily * 0.3
+            else:
+                return daily * 0.8
+        
+        # Weekend patterns
+        else:
+            # Late morning peak (9-12)
+            if 9 <= hour <= 12:
+                return daily * 1.8
+            # Afternoon/evening (13-22)
+            elif 13 <= hour <= 22:
                 return daily * 1.5
-            return daily * 0.5
-        elif self.usage_pattern == "Night-heavy":
-            if 7 <= hour < 23:  # Daytime hours
-                return daily * 0.5
-            return daily * 1.5
-        return daily
+            # Night hours
+            else:
+                return daily * 0.4
 
     def get_consumption_confidence_intervals(self, date=None):
         """Calculate confidence intervals for consumption prediction"""
