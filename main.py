@@ -22,14 +22,26 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Cache price data with fixed TTL based on forecast hours range
-@st.cache_data(ttl=1800)  # 30 minutes cache
+def get_max_forecast_hours():
+    """Calculate maximum available forecast hours based on current time"""
+    now = datetime.now()
+    publication_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
+    if now >= publication_time:
+        # After 13:00 CET, we have tomorrow's prices plus additional forecast
+        return 48  # Extended to 48 hours
+    else:
+        # Before 13:00 CET, calculate remaining hours plus next day
+        remaining_hours = 24 - now.hour
+        return max(24, remaining_hours + 24)  # Ensure at least 24 hours
+
+# Cache price data with TTL based on forecast hours
+@st.cache_data(ttl=900)  # 15 minutes cache
 def get_cached_prices(forecast_hours):
     """Get cached price data with extended forecast support"""
     return get_day_ahead_prices(forecast_hours=forecast_hours)
 
-# Cache optimization results with fixed TTL
-@st.cache_data(ttl=900)  # 15 minutes cache
+# Cache optimization results
+@st.cache_data(ttl=600)  # 10 minutes cache
 def get_cached_optimization(_prices, _battery):
     """Get cached optimization results"""
     return optimize_schedule(_prices, _battery)
@@ -59,9 +71,9 @@ def main():
                 monthly_distribution=default_profile.monthly_distribution
             )
     
-    # Initialize forecast hours with extended default value
+    # Initialize forecast hours with default value
     if 'forecast_hours' not in st.session_state:
-        st.session_state.forecast_hours = 36
+        st.session_state.forecast_hours = 24
     
     # Layout
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -77,19 +89,19 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             
-            # Add forecast hours selector with extended range
+            # Add forecast hours selector with dynamic maximum
+            max_hours = get_max_forecast_hours()
             forecast_hours = st.slider(
                 "Forecast Hours",
                 min_value=12,
-                max_value=48,  # Extended maximum
-                value=st.session_state.forecast_hours,
+                max_value=max_hours,
+                value=min(st.session_state.forecast_hours, max_hours),
                 step=1,
-                help="Select number of hours to forecast (12-48 hours, adjustable by hour)"
+                help=f"Select number of hours to forecast (12-{max_hours} hours)"
             )
             
             if forecast_hours != st.session_state.forecast_hours:
                 st.session_state.forecast_hours = forecast_hours
-                # Clear relevant caches
                 st.cache_data.clear()
             
             try:

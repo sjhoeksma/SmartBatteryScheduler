@@ -13,11 +13,6 @@ def get_day_ahead_prices(forecast_hours=24):
     Args:
         forecast_hours (int): Number of hours to forecast prices for (12-48 hours)
     """
-    # Base configuration
-    BASE_PRICE = 0.22
-    peak_hours = [7, 8, 9, 17, 18, 19, 20]
-    shoulder_hours = [10, 11, 12, 13, 14, 15, 16]
-    
     try:
         # Validate and bound forecast hours with extended range
         forecast_hours = max(12, min(forecast_hours, 48))
@@ -26,18 +21,21 @@ def get_day_ahead_prices(forecast_hours=24):
         current_hour = now.replace(minute=0, second=0, microsecond=0)
         publication_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
         
-        # Generate dates using periods
+        # Generate dates for the entire forecast period
         dates = pd.date_range(start=current_hour, periods=forecast_hours, freq='h')
-        
         prices = []
+        
         for date in dates:
             hour = date.hour
             hours_ahead = max(0, (date - now).total_seconds() / 3600)
             
-            # Enhanced uncertainty model for extended forecasts with smoother transition
-            uncertainty_factor = 0.15 / (1 + np.exp(-(hours_ahead - 24) / 12))
+            # Dynamic base price adjusted for forecast horizon
+            BASE_PRICE = 0.22 * (1 + (hours_ahead - 24) / 48 * 0.1 if hours_ahead > 24 else 1)
             
-            # Improved weekly pattern with gradual transitions
+            # Enhanced uncertainty model for extended forecasts
+            uncertainty_factor = 0.05 + (hours_ahead / 48) * 0.1
+            
+            # Improved weekly pattern with enhanced seasonality
             day_of_week = date.weekday()
             weekend_factor = np.sin(np.pi * day_of_week / 7) * 0.05
             weekly_factor = 1.0 + (weekend_factor if day_of_week < 5 else -weekend_factor)
@@ -47,31 +45,39 @@ def get_day_ahead_prices(forecast_hours=24):
             daily_factor = (np.sin(2 * np.pi * hourly_factor) * 0.1 + 
                           np.sin(4 * np.pi * hourly_factor) * 0.05)
             
-            if hour in peak_hours:
+            # Price calculation with hour-based factors
+            if hour in [7, 8, 9, 17, 18, 19, 20]:
                 # Peak hours with enhanced variability
                 price = BASE_PRICE * weekly_factor * (1.0 + np.random.uniform(0.3, 0.5) + daily_factor)
-            elif hour in shoulder_hours:
+            elif hour in [10, 11, 12, 13, 14, 15, 16]:
                 # Shoulder hours with moderate variability
                 price = BASE_PRICE * weekly_factor * (1.0 + np.random.uniform(0.1, 0.3) + daily_factor)
             else:
                 # Off-peak hours with reduced variability
                 price = BASE_PRICE * weekly_factor * (1.0 + np.random.uniform(-0.3, 0.0) + daily_factor)
             
-            # Apply smoothed uncertainty with positive scale and distance-based dampening
-            uncertainty = np.random.normal(0, max(0.001, uncertainty_factor))
-            dampening_factor = 1.0 / (1 + hours_ahead / 48)  # Reduce volatility for distant forecasts
+            # Apply smoothed uncertainty with horizon-based dampening
+            uncertainty = np.random.normal(0, uncertainty_factor)
+            dampening_factor = 1.0 / (1 + hours_ahead / 48)
             price *= (1.0 + uncertainty * dampening_factor)
             
-            # Ensure minimum price and add to list with maximum cap
-            prices.append(max(0.05, min(0.8, price)))  # Cap maximum price at 0.8 €/kWh
+            # Dynamic price bounds based on forecast horizon
+            if hours_ahead <= 24:
+                price = max(0.08, min(0.6, price))
+            else:
+                # Wider bounds for extended forecast
+                price = max(0.05, min(0.8, price))
+            
+            prices.append(price)
         
         return pd.Series(prices, index=dates)
     
     except Exception as e:
-        # Log error and return fallback prices with proper base price reference
         print(f"Error generating price data: {str(e)}")
+        # Ensure current_hour is defined in the exception handler
+        current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
         dates = pd.date_range(start=current_hour, periods=forecast_hours, freq='h')
-        return pd.Series([BASE_PRICE] * len(dates), index=dates)
+        return pd.Series([0.22] * len(dates), index=dates)
 
 def is_prices_available_for_tomorrow():
     """Check if tomorrow's prices are available"""
@@ -92,6 +98,6 @@ def get_price_forecast_confidence(date):
         return 1.0  # Actual day-ahead prices
     else:
         # Enhanced confidence decay model for extended forecasts
-        # Slower initial decay, maintaining higher confidence for near-term forecasts
-        confidence = 0.85 * np.exp(-hours_ahead / 72) + 0.15
-        return max(0.15, min(1.0, confidence))
+        # More gradual decay for near-term forecasts
+        confidence = 0.9 * np.exp(-max(0, hours_ahead - 24) / 72) + 0.1
+        return max(0.1, min(1.0, confidence))
