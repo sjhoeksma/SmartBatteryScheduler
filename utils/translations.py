@@ -68,6 +68,26 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Scheduled Operations",
         nl="Geplande Operaties"
     ),
+    "operation": Translation(
+        en="Operation",
+        nl="Operatie"
+    ),
+    "operation_charge": Translation(
+        en="Charge",
+        nl="Opladen"
+    ),
+    "power_kw": Translation(
+        en="Power (kW)",
+        nl="Vermogen (kW)"
+    ),
+    "start_time": Translation(
+        en="Start Time",
+        nl="Starttijd"
+    ),
+    "add_schedule": Translation(
+        en="Add Schedule",
+        nl="Schema Toevoegen"
+    ),
     "charge_power_kw": Translation(
         en="Charge Power (kW)",
         nl="Laadvermogen (kW)"
