@@ -39,9 +39,9 @@ def calculate_price_thresholds(_effective_prices, _date):
     rolling_mean = daily_prices.rolling(window=24, min_periods=1, center=True).mean()
     rolling_std = daily_prices.rolling(window=24, min_periods=1, center=True).std()
     
-    # Calculate dynamic thresholds
-    charge_threshold = rolling_mean - 0.5 * rolling_std
-    discharge_threshold = rolling_mean + 0.5 * rolling_std
+    # Calculate dynamic thresholds with reduced bands (0.3 multiplier)
+    charge_threshold = rolling_mean - 0.3 * rolling_std
+    discharge_threshold = rolling_mean + 0.3 * rolling_std
     
     return {
         'charge': charge_threshold.mean(),
@@ -58,7 +58,7 @@ def optimize_schedule(_prices, _battery):
     Strategy:
     1. Calculate effective prices considering confidence weighting
     2. Use rolling window analysis for price thresholds
-    3. Compare future prices for discharge opportunities
+    3. Compare future prices with less restrictive thresholds
     4. Maintain cycle and event limits while maximizing profitability
     """
     periods = len(_prices)
@@ -66,9 +66,9 @@ def optimize_schedule(_prices, _battery):
     predicted_soc = np.zeros(periods * 4 + 1)
     consumption_stats = analyze_consumption_patterns(_battery, _prices.index)
     
-    # Calculate effective prices with confidence weighting and preserve datetime index
+    # Calculate effective prices with reduced confidence weighting impact
     effective_prices = pd.Series(
-        [_battery.get_effective_price(price, date.hour) * get_price_forecast_confidence(date)
+        [_battery.get_effective_price(price, date.hour) * (0.9 + 0.1 * get_price_forecast_confidence(date))
          for price, date in zip(_prices.values, _prices.index)],
         index=_prices.index
     )
@@ -112,10 +112,10 @@ def optimize_schedule(_prices, _battery):
         # Initialize schedule value for this period
         schedule[i] = 0
         
-        # Look ahead for better prices (2-4 hours)
+        # Look ahead for better prices with less restrictive comparison
         look_ahead_end = min(i + 4, periods)
         future_prices = effective_prices.iloc[i+1:look_ahead_end]
-        future_max_price = future_prices.max() if len(future_prices) > 0 else 0
+        future_max_price = future_prices.mean() + 0.2 * future_prices.std() if len(future_prices) > 0 else 0
         
         # Calculate consumption impact
         consumption_impact = min(
@@ -128,8 +128,9 @@ def optimize_schedule(_prices, _battery):
         available_discharge = _battery.capacity * (current_soc - _battery.min_soc)
         
         if remaining_cycles > 0:
-            # Charging decision
-            if (current_price <= thresholds['charge'] and 
+            # Charging decision with relative threshold
+            relative_charge_threshold = thresholds['rolling_mean'] * 1.05  # Allow charging up to 105% of rolling mean
+            if (current_price <= relative_charge_threshold and 
                 daily_events[current_date]['charge_events'] < _battery.max_charge_events and
                 available_capacity > 0):
                 max_allowed_charge = min(
@@ -142,9 +143,9 @@ def optimize_schedule(_prices, _battery):
                     daily_events[current_date]['charge_events'] += 1
                     daily_events[current_date]['cycles'] += max_allowed_charge / _battery.capacity
             
-            # Discharging decision with future price comparison
-            elif (current_price >= thresholds['discharge'] and 
-                  current_price > future_max_price and  # Only discharge if current price is higher than future prices
+            # Discharging decision with relative threshold and future price comparison
+            elif (current_price >= thresholds['rolling_mean'] * 0.95 and  # Allow discharging at 95% of rolling mean
+                  current_price > future_max_price * 0.9 and  # Less restrictive future price comparison
                   daily_events[current_date]['discharge_events'] < _battery.max_discharge_events and
                   available_discharge > 0):
                 max_allowed_discharge = min(
