@@ -11,5 +11,6 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.0.1",
     "requests>=2.32.3",
+    "scipy",
     "streamlit>=1.40.0",
 ]

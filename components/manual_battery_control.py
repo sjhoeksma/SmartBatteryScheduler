@@ -158,9 +158,9 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                                 end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)].time()
                                 
                                 schedule_data.append({
-                                    get_text("operation"): get_text("operation_charge") if current_operation['power'] > 0 
+                                    get_text("operation"): get_text("operation_charge") if power > 0 
                                                       else get_text("operation_discharge"),
-                                    get_text("power_kw"): abs(current_operation['power']),
+                                    get_text("power_kw"): abs(schedule[i]),  # Use actual power value from schedule
                                     get_text("start_time"): start_time.strftime('%H:%M'),
                                     get_text("duration_hours"): duration,
                                     'End Time': end_time.strftime('%H:%M'),
@@ -186,7 +186,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                     schedule_data.append({
                         get_text("operation"): get_text("operation_charge") if current_operation['power'] > 0 
                                           else get_text("operation_discharge"),
-                        get_text("power_kw"): abs(current_operation['power']),
+                        get_text("power_kw"): abs(schedule[start_idx]),  # Use actual power value from schedule
                         get_text("start_time"): start_time.strftime('%H:%M'),
                         get_text("duration_hours"): duration,
                         'End Time': end_time.strftime('%H:%M'),
