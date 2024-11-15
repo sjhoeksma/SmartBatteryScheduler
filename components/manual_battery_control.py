@@ -15,12 +15,12 @@ def load_schedules():
     """Load schedules from the database"""
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=DictCursor) as cur:
-            cur.execute("""
+            cur.execute('''
                 SELECT operation, power, start_time, duration, status
                 FROM battery_schedules
-                WHERE start_time::date >= CURRENT_DATE
+                WHERE DATE(start_time) >= CURRENT_DATE
                 ORDER BY start_time;
-            """)
+            ''')
             schedules = []
             for row in cur:
                 schedules.append({
@@ -36,13 +36,21 @@ def save_schedule(schedule):
     """Save a schedule to the database"""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO battery_schedules (operation, power, start_time, duration, status)
+            # Convert time to datetime if needed
+            if isinstance(schedule['start_time'], datetime.time):
+                today = datetime.today().date()
+                start_time = datetime.combine(today, schedule['start_time'])
+            else:
+                start_time = schedule['start_time']
+            
+            cur.execute('''
+                INSERT INTO battery_schedules 
+                (operation, power, start_time, duration, status)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (
+            ''', (
                 schedule['operation'],
                 schedule['power'],
-                schedule['start_time'],
+                start_time,
                 schedule['duration'],
                 schedule['status']
             ))
@@ -170,25 +178,25 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         st.markdown("### " + get_text("scheduled_operations"))
         
         schedule_data = []
-        current_time = datetime.now().time()
+        current_time = datetime.now()
         
         # Process manual schedules
         for schedule_entry in st.session_state.battery_schedules:
-            start_datetime = datetime.combine(datetime.today(), schedule_entry['start_time'])
-            end_time = (start_datetime + timedelta(hours=schedule_entry['duration'])).time()
+            start_datetime = schedule_entry['start_time']
+            end_datetime = start_datetime + timedelta(hours=schedule_entry['duration'])
             
             status = get_text("scheduled")
-            if current_time > end_time:
+            if current_time > end_datetime:
                 status = get_text("completed")
-            elif current_time >= schedule_entry['start_time']:
+            elif current_time >= start_datetime:
                 status = get_text("in_progress")
             
             schedule_data.append({
                 get_text("operation"): schedule_entry['operation'],
                 get_text("power_kw"): schedule_entry['power'],
-                get_text("start_time"): schedule_entry['start_time'].strftime('%H:%M'),
+                get_text("start_time"): start_datetime.strftime('%H:%M'),
                 get_text("duration_hours"): schedule_entry['duration'],
-                'End Time': end_time.strftime('%H:%M'),
+                'End Time': end_datetime.strftime('%H:%M'),
                 'Status': status,
                 'Type': 'Manual'
             })
@@ -207,8 +215,8 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                         if current_operation is not None and abs(current_operation['power']) > power_threshold:
                             duration = i - start_idx
                             if duration > 0:  # Only add if duration is positive
-                                start_time = prices.index[start_idx].time()
-                                end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)].time()
+                                start_time = prices.index[start_idx]
+                                end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)]
                                 
                                 schedule_data.append({
                                     get_text("operation"): get_text("operation_charge") if power > 0 
@@ -228,8 +236,8 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                     # End current operation if power drops below threshold
                     duration = i - start_idx
                     if duration > 0 and abs(current_operation['power']) > power_threshold:
-                        start_time = prices.index[start_idx].time()
-                        end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)].time()
+                        start_time = prices.index[start_idx]
+                        end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)]
                         
                         schedule_data.append({
                             get_text("operation"): get_text("operation_charge") if current_operation['power'] > 0 
@@ -247,8 +255,8 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
             if current_operation is not None and abs(current_operation['power']) > power_threshold:
                 duration = len(schedule) - start_idx
                 if duration > 0:  # Only add if duration is positive
-                    start_time = prices.index[start_idx].time()
-                    end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)].time()
+                    start_time = prices.index[start_idx]
+                    end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)]
                     
                     schedule_data.append({
                         get_text("operation"): get_text("operation_charge") if current_operation['power'] > 0 
