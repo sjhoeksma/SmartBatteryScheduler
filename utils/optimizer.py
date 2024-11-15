@@ -39,7 +39,7 @@ def calculate_price_thresholds(_effective_prices, _date):
     rolling_mean = daily_prices.rolling(window=24, min_periods=1, center=True).mean()
     rolling_std = daily_prices.rolling(window=24, min_periods=1, center=True).std()
     
-    # Calculate dynamic thresholds with reduced bands (0.3 multiplier)
+    # Calculate dynamic thresholds
     charge_threshold = rolling_mean - 0.3 * rolling_std
     discharge_threshold = rolling_mean + 0.3 * rolling_std
     
@@ -158,27 +158,22 @@ def optimize_schedule(_prices, _battery):
                     daily_events[current_date]['discharge_events'] += 1
                     daily_events[current_date]['cycles'] += max_allowed_discharge / _battery.capacity
         
-        # Calculate SOC change with bounds checking
+        # Calculate SOC change immediately when charging/discharging occurs
         strategic_change = schedule[i] / _battery.capacity
         total_change = strategic_change - consumption_impact
-        
-        # Validate SOC bounds
-        next_soc = current_soc + total_change
-        if next_soc < _battery.min_soc:
-            # Adjust change to maintain minimum SOC
-            total_change = _battery.min_soc - current_soc
-            schedule[i] = (total_change + consumption_impact) * _battery.capacity
-        elif next_soc > _battery.max_soc:
-            # Adjust change to maintain maximum SOC
-            total_change = _battery.max_soc - current_soc
-            schedule[i] = (total_change + consumption_impact) * _battery.capacity
-        
-        # Calculate intermediate points with averaged transitions
+
+        # Update intermediate points starting from the current hour
         for j in range(4):
             point_index = i * 4 + j + 1
-            alpha = (j + 1) / 4
+            # Use immediate change for charging/discharging
+            if schedule[i] != 0:
+                # When charging/discharging, apply change immediately
+                alpha = j / 4  # Start change from beginning of hour
+            else:
+                # For consumption-only periods, keep gradual change
+                alpha = (j + 1) / 4
+            
             predicted_soc[point_index] = current_soc + (total_change * alpha)
-            # Ensure intermediate points are within bounds
             predicted_soc[point_index] = np.clip(
                 predicted_soc[point_index],
                 _battery.min_soc,
@@ -188,7 +183,15 @@ def optimize_schedule(_prices, _battery):
         # Update current SOC for next hour
         current_soc += total_change
         
-        # Ensure final SOC is within bounds
+        # Ensure SOC stays within limits
         current_soc = np.clip(current_soc, _battery.min_soc, _battery.max_soc)
+        
+        # Set final SOC point if this is the last period
+        if i == periods - 1:
+            predicted_soc[-1] = np.clip(
+                current_soc + total_change,
+                _battery.min_soc,
+                _battery.max_soc
+            )
     
     return schedule, predicted_soc, consumption_stats
