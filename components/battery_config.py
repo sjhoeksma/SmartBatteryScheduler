@@ -222,22 +222,41 @@ def render_battery_config():
         new_name = st.text_input(get_text("profile_name"))
         if st.form_submit_button("Create Profile"):
             if new_name and new_name not in profiles:
+                # Use current form values instead of battery instance
                 new_profile = BatteryProfile(
                     name=new_name,
-                    capacity=st.session_state.battery.capacity,
-                    min_soc=st.session_state.battery.min_soc,
-                    max_soc=st.session_state.battery.max_soc,
-                    charge_rate=st.session_state.battery.charge_rate,
-                    daily_consumption=st.session_state.battery.daily_consumption,
-                    usage_pattern=st.session_state.battery.usage_pattern,
-                    yearly_consumption=st.session_state.battery.yearly_consumption,
-                    monthly_distribution=st.session_state.battery.monthly_distribution,
-                    surcharge_rate=round(st.session_state.battery.surcharge_rate, 3),
-                    max_daily_cycles=st.session_state.battery.max_daily_cycles,
-                    max_charge_events=st.session_state.battery.max_charge_events,
-                    max_discharge_events=st.session_state.battery.max_discharge_events
+                    capacity=capacity,
+                    min_soc=min_soc,
+                    max_soc=max_soc,
+                    charge_rate=charge_rate,
+                    daily_consumption=daily_consumption,
+                    usage_pattern=usage_pattern,
+                    yearly_consumption=yearly_consumption,
+                    monthly_distribution=profile.monthly_distribution,
+                    surcharge_rate=round(surcharge_rate, 3),
+                    max_daily_cycles=max_daily_cycles,
+                    max_charge_events=max_charge_events,
+                    max_discharge_events=max_discharge_events
                 )
                 st.session_state.store.save_profile(new_profile)
+                
+                # Update battery instance with new profile
+                st.session_state.battery = Battery(
+                    capacity=capacity,
+                    min_soc=min_soc,
+                    max_soc=max_soc,
+                    charge_rate=charge_rate,
+                    profile_name=new_name,  # Use new profile name
+                    daily_consumption=daily_consumption,
+                    usage_pattern=usage_pattern,
+                    yearly_consumption=yearly_consumption,
+                    monthly_distribution=profile.monthly_distribution,
+                    surcharge_rate=round(surcharge_rate, 3),
+                    max_daily_cycles=max_daily_cycles,
+                    max_charge_events=max_charge_events,
+                    max_discharge_events=max_discharge_events
+                )
                 st.success(get_text("profile_created").format(new_name))
+                st.rerun()  # Rerun to show updated profile selection
             else:
                 st.error(get_text("provide_unique_name"))
