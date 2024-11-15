@@ -169,13 +169,8 @@ def optimize_schedule(_prices, _battery):
         for j in range(4):
             point_index = i * 4 + j
             if schedule[i] != 0:
-                # For charging/discharging, apply changes immediately at the start
-                if j == 0:
-                    # Immediate full change at start of period
-                    predicted_soc[point_index] = current_soc + total_change
-                else:
-                    # Maintain the changed level for rest of period
-                    predicted_soc[point_index] = predicted_soc[point_index - 1]
+                # For charging/discharging, apply full change immediately
+                predicted_soc[point_index] = current_soc + total_change
             else:
                 # For consumption-only periods, keep gradual change
                 alpha = (j + 1) / 4
