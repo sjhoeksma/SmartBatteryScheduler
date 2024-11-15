@@ -36,13 +36,13 @@ def calculate_price_thresholds(_effective_prices, _date):
     daily_prices = _effective_prices[mask]
     
     # Calculate rolling statistics with adaptive window for extended timelines
-    window_size = min(24, len(daily_prices))
+    window_size = min(36, len(daily_prices))
     rolling_mean = daily_prices.rolling(window=window_size, min_periods=1, center=True).mean()
     rolling_std = daily_prices.rolling(window=window_size, min_periods=1, center=True).std()
     
-    # Calculate dynamic thresholds
-    charge_threshold = rolling_mean - 0.3 * rolling_std
-    discharge_threshold = rolling_mean + 0.3 * rolling_std
+    # Calculate dynamic thresholds with updated factors for better statistical significance
+    charge_threshold = rolling_mean - 0.7 * rolling_std    # Changed from 0.5 to 0.7
+    discharge_threshold = rolling_mean + 0.7 * rolling_std # Changed from 0.5 to 0.7
     
     return {
         'charge': charge_threshold.mean(),
@@ -114,11 +114,14 @@ def optimize_schedule(_prices, _battery):
         # Initialize schedule value for this period
         schedule[i] = 0
         
-        # Look ahead for better prices with adaptive window for extended timelines
-        look_ahead_window = min(8, periods - i - 1)  # Increased look-ahead window
+        # Look ahead for better prices with extended window
+        look_ahead_window = min(36, periods - i - 1)  # Increased from 24 to 36
         look_ahead_end = min(i + look_ahead_window, periods)
         future_prices = effective_prices.iloc[i+1:look_ahead_end]
-        future_max_price = future_prices.mean() + 0.2 * future_prices.std() if len(future_prices) > 0 else 0
+        future_max_price = future_prices.max() if len(future_prices) > 0 else 0
+        
+        # Add strict peak detection with higher threshold
+        is_peak = current_price >= future_prices.quantile(0.95) if len(future_prices) > 0 else True  # Changed from 0.9 to 0.95
         
         # Calculate consumption impact
         consumption_impact = min(
@@ -132,7 +135,7 @@ def optimize_schedule(_prices, _battery):
         
         if remaining_cycles > 0:
             # Charging decision with relative threshold
-            relative_charge_threshold = thresholds['rolling_mean'] * 1.05
+            relative_charge_threshold = thresholds['rolling_mean'] * 0.95
             if (current_price <= relative_charge_threshold and 
                 daily_events[current_date]['charge_events'] < _battery.max_charge_events and
                 available_capacity > 0):
@@ -146,9 +149,12 @@ def optimize_schedule(_prices, _battery):
                     daily_events[current_date]['charge_events'] += 1
                     daily_events[current_date]['cycles'] += max_allowed_charge / _battery.capacity
             
-            # Discharging decision with relative threshold and future price comparison
-            elif (current_price >= thresholds['rolling_mean'] * 0.95 and
-                  current_price > future_max_price * 0.9 and
+            # Add peak price preservation check with more sensitive threshold
+            elif not is_peak and future_prices.max() > current_price * 1.05:  # Changed from 1.1 to 1.05
+                continue  # Skip discharge, better prices coming
+            
+            # Discharging decision with peak detection and relative threshold
+            elif (is_peak and current_price >= future_max_price * 0.98 and  # Changed from 0.95 to 0.98
                   daily_events[current_date]['discharge_events'] < _battery.max_discharge_events and
                   available_discharge > 0):
                 max_allowed_discharge = min(
