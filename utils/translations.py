@@ -30,6 +30,10 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Cost Calculator",
         nl="Kostenberekening"
     ),
+    "manual_control": Translation(
+        en="Manual Control",
+        nl="Handmatige Bediening"
+    ),
     "power_flow": Translation(
         en="Power Flow",
         nl="Energiestroom"
@@ -49,6 +53,68 @@ TRANSLATIONS: Dict[str, Translation] = {
     "deficit": Translation(
         en="Deficit",
         nl="Tekort"
+    ),
+    
+    # Battery control translations
+    "immediate_control": Translation(
+        en="Immediate Control",
+        nl="Directe Bediening"
+    ),
+    "schedule_control": Translation(
+        en="Schedule Control",
+        nl="Schema Beheer"
+    ),
+    "scheduled_operations": Translation(
+        en="Scheduled Operations",
+        nl="Geplande Operaties"
+    ),
+    "charge_power_kw": Translation(
+        en="Charge Power (kW)",
+        nl="Laadvermogen (kW)"
+    ),
+    "discharge_power_kw": Translation(
+        en="Discharge Power (kW)",
+        nl="Ontlaadvermogen (kW)"
+    ),
+    "start_charging": Translation(
+        en="Start Charging",
+        nl="Start Opladen"
+    ),
+    "start_discharging": Translation(
+        en="Start Discharging",
+        nl="Start Ontladen"
+    ),
+    "charging_started": Translation(
+        en="Charging started successfully",
+        nl="Opladen succesvol gestart"
+    ),
+    "charge_failed": Translation(
+        en="Failed to start charging",
+        nl="Opladen kon niet worden gestart"
+    ),
+    "discharge_failed": Translation(
+        en="Failed to start discharging",
+        nl="Ontladen kon niet worden gestart"
+    ),
+    "capacity_limit_reached": Translation(
+        en="Battery capacity limit reached",
+        nl="Batterijcapaciteitslimiet bereikt"
+    ),
+    "minimum_soc_reached": Translation(
+        en="Minimum state of charge reached",
+        nl="Minimale laadtoestand bereikt"
+    ),
+    "clear_all_schedules": Translation(
+        en="Clear All Schedules",
+        nl="Alle Schema's Wissen"
+    ),
+    "schedules_cleared": Translation(
+        en="All schedules have been cleared",
+        nl="Alle schema's zijn gewist"
+    ),
+    "price_and_prediction": Translation(
+        en="Price and Prediction",
+        nl="Prijs en Voorspelling"
     ),
     
     # Historical Analysis tab titles
