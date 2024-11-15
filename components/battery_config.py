@@ -178,7 +178,27 @@ def render_battery_config():
         st.plotly_chart(render_monthly_distribution(profile.monthly_distribution), use_container_width=True)
         
         if st.form_submit_button("Update Configuration"):
-            # Update battery with new configuration
+            # Create updated profile
+            updated_profile = BatteryProfile(
+                name=current_profile,
+                capacity=capacity,
+                min_soc=min_soc,
+                max_soc=max_soc,
+                charge_rate=charge_rate,
+                daily_consumption=daily_consumption,
+                usage_pattern=usage_pattern,
+                yearly_consumption=yearly_consumption,
+                monthly_distribution=profile.monthly_distribution,
+                surcharge_rate=round(surcharge_rate, 3),
+                max_daily_cycles=max_daily_cycles,
+                max_charge_events=max_charge_events,
+                max_discharge_events=max_discharge_events
+            )
+            
+            # Save updated profile to store
+            st.session_state.store.save_profile(updated_profile)
+            
+            # Update battery instance
             st.session_state.battery = Battery(
                 capacity=capacity,
                 min_soc=min_soc,
