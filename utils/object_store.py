@@ -59,6 +59,11 @@ class ObjectStore:
             print(f"Error saving schedule: {str(e)}")
             raise
     
+    def remove_schedule(self, index: int) -> None:
+        if 0 <= index < len(st.session_state.persist_schedules):
+            st.session_state.persist_schedules.pop(index)
+            self._save_to_file()
+    
     def load_schedules(self) -> List[Dict[str, Any]]:
         current_date = datetime.now(timezone.utc).date()
         return [s for s in st.session_state.persist_schedules 

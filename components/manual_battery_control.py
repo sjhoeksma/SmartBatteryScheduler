@@ -217,7 +217,19 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         
         if schedule_data:
             schedule_df = pd.DataFrame(schedule_data)
-            st.dataframe(schedule_df, use_container_width=True)
+            
+            # Add delete buttons for manual schedules
+            if not schedule_df.empty:
+                for idx, row in schedule_df.iterrows():
+                    if row['Type'] == 'Manual':  # Only allow deletion of manual schedules
+                        col1, col2 = st.columns([0.9, 0.1])
+                        with col1:
+                            st.write(f"{row[get_text('operation')]} - {row[get_text('power_kw')]}kW - {row[get_text('start_time')]} ({row[get_text('duration_hours')]}h)")
+                        with col2:
+                            if st.button('🗑️', key=f'delete_{idx}'):
+                                st.session_state.store.remove_schedule(idx)
+                                st.session_state.battery_schedules = st.session_state.store.load_schedules()
+                                st.rerun()
             
             if st.button(get_text("clear_all_schedules")):
                 st.session_state.store.clear_schedules()
