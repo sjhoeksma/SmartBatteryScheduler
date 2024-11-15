@@ -15,10 +15,24 @@ def load_schedules():
     """Load schedules from the database"""
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=DictCursor) as cur:
+            # Create table if not exists
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS battery_schedules (
+                    id SERIAL PRIMARY KEY,
+                    operation VARCHAR(50) NOT NULL,
+                    power FLOAT NOT NULL,
+                    start_time TIMESTAMP NOT NULL,
+                    duration INTEGER NOT NULL,
+                    status VARCHAR(50) NOT NULL
+                );
+            ''')
+            conn.commit()
+            
+            # Load schedules
             cur.execute('''
                 SELECT operation, power, start_time, duration, status
                 FROM battery_schedules
-                WHERE DATE(start_time) >= CURRENT_DATE
+                WHERE start_time::date >= CURRENT_DATE
                 ORDER BY start_time;
             ''')
             schedules = []
