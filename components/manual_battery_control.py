@@ -3,6 +3,57 @@ import pandas as pd
 from datetime import datetime, timedelta
 from utils.translations import get_text
 from components.price_chart import render_price_chart
+import psycopg2
+from psycopg2.extras import DictCursor
+import os
+
+def get_db_connection():
+    """Create a database connection"""
+    return psycopg2.connect(os.environ["DATABASE_URL"])
+
+def load_schedules():
+    """Load schedules from the database"""
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("""
+                SELECT operation, power, start_time, duration, status
+                FROM battery_schedules
+                WHERE start_time::date >= CURRENT_DATE
+                ORDER BY start_time;
+            """)
+            schedules = []
+            for row in cur:
+                schedules.append({
+                    'operation': row['operation'],
+                    'power': row['power'],
+                    'start_time': row['start_time'],
+                    'duration': row['duration'],
+                    'status': row['status']
+                })
+            return schedules
+
+def save_schedule(schedule):
+    """Save a schedule to the database"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO battery_schedules (operation, power, start_time, duration, status)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                schedule['operation'],
+                schedule['power'],
+                schedule['start_time'],
+                schedule['duration'],
+                schedule['status']
+            ))
+        conn.commit()
+
+def clear_schedules():
+    """Clear all schedules from the database"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM battery_schedules")
+        conn.commit()
 
 def render_manual_battery_control(battery, prices=None, schedule=None, predicted_soc=None, consumption_stats=None):
     """Render manual battery control interface with scheduling"""
@@ -10,7 +61,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
     
     # Initialize session state for schedules if not exists
     if 'battery_schedules' not in st.session_state:
-        st.session_state.battery_schedules = []
+        st.session_state.battery_schedules = load_schedules()
     
     # Display prediction chart if data is available
     if prices is not None:
@@ -110,7 +161,8 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                 'duration': duration,
                 'status': 'Manual'
             }
-            st.session_state.battery_schedules.append(new_schedule)
+            save_schedule(new_schedule)
+            st.session_state.battery_schedules = load_schedules()
             st.success(get_text("schedule_added"))
     
     # Display schedules
@@ -214,5 +266,6 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
             st.dataframe(schedule_df, use_container_width=True)
             
             if st.button(get_text("clear_all_schedules")):
+                clear_schedules()
                 st.session_state.battery_schedules = []
                 st.success(get_text("schedules_cleared"))
