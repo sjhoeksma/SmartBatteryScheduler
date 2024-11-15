@@ -3,24 +3,53 @@ import os
 from datetime import datetime, time, timezone
 from typing import List, Dict, Any
 import streamlit as st
+from utils.battery_profiles import BatteryProfile
 
 class ObjectStore:
     def __init__(self):
-        self.storage_file = 'schedules.json'
+        self.schedule_file = 'schedules.json'
+        self.profile_file = 'battery_profiles.json'
         if 'persist_schedules' not in st.session_state:
-            st.session_state.persist_schedules = self._load_from_file()
+            st.session_state.persist_schedules = self._load_schedules()
+        if 'profiles' not in st.session_state:
+            st.session_state.profiles = {}
+            loaded_profiles = self._load_profiles()
+            for name, profile_data in loaded_profiles.items():
+                profile = BatteryProfile(**profile_data)
+                st.session_state.profiles[name] = profile
+            
+            if not st.session_state.profiles:
+                # Create default profile if none exists
+                default_profile = BatteryProfile(
+                    name="Home Battery",
+                    capacity=10.0,
+                    min_soc=0.2,
+                    max_soc=0.9,
+                    charge_rate=3.7,
+                    daily_consumption=15.0,
+                    usage_pattern="Flat",
+                    yearly_consumption=5475.0,
+                    monthly_distribution={
+                        1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
+                        7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
+                    },
+                    surcharge_rate=0.050,
+                    max_daily_cycles=1.5,
+                    max_charge_events=2,
+                    max_discharge_events=1
+                )
+                self.save_profile(default_profile)
     
-    def _load_from_file(self) -> List[Dict[str, Any]]:
-        if os.path.exists(self.storage_file):
+    def _load_schedules(self) -> List[Dict[str, Any]]:
+        if os.path.exists(self.schedule_file):
             try:
-                with open(self.storage_file, 'r') as f:
+                with open(self.schedule_file, 'r') as f:
                     schedules = json.load(f)
                     # Convert string dates back to datetime with proper timezone handling
                     for s in schedules:
                         try:
                             s['start_time'] = datetime.fromisoformat(s['start_time'])
                         except (ValueError, TypeError):
-                            # Handle invalid datetime strings or None values
                             continue
                     return [s for s in schedules if s.get('start_time')]  # Filter out invalid entries
             except Exception as e:
@@ -28,10 +57,9 @@ class ObjectStore:
                 return []
         return []
     
-    def _save_to_file(self) -> None:
+    def _save_schedules(self) -> None:
         try:
             schedules = st.session_state.persist_schedules
-            # Convert datetime to string for JSON serialization with proper timezone handling
             serializable_schedules = []
             for s in schedules:
                 if s.get('start_time'):
@@ -40,10 +68,62 @@ class ObjectStore:
                         s_copy['start_time'] = s_copy['start_time'].isoformat()
                     serializable_schedules.append(s_copy)
             
-            with open(self.storage_file, 'w') as f:
+            with open(self.schedule_file, 'w') as f:
                 json.dump(serializable_schedules, f, indent=2)
         except Exception as e:
             print(f"Error saving schedules: {str(e)}")
+
+    def _load_profiles(self) -> Dict[str, Any]:
+        if os.path.exists(self.profile_file):
+            try:
+                with open(self.profile_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error loading profiles: {str(e)}")
+                return {}
+        return {}
+
+    def save_profile(self, profile: BatteryProfile) -> None:
+        if 'profiles' not in st.session_state:
+            st.session_state.profiles = {}
+        st.session_state.profiles[profile.name] = profile
+        self._save_profiles_to_file()
+
+    def remove_profile(self, profile_name: str) -> None:
+        if 'profiles' in st.session_state and profile_name in st.session_state.profiles:
+            del st.session_state.profiles[profile_name]
+            self._save_profiles_to_file()
+
+    def get_profile(self, name: str) -> BatteryProfile:
+        return st.session_state.profiles.get(name)
+
+    def list_profiles(self) -> List[str]:
+        return list(st.session_state.profiles.keys()) if 'profiles' in st.session_state else []
+
+    def _save_profiles_to_file(self) -> None:
+        try:
+            profiles_data = {}
+            for name, profile in st.session_state.profiles.items():
+                profiles_data[name] = {
+                    'name': profile.name,
+                    'capacity': profile.capacity,
+                    'min_soc': profile.min_soc,
+                    'max_soc': profile.max_soc,
+                    'charge_rate': profile.charge_rate,
+                    'daily_consumption': profile.daily_consumption,
+                    'usage_pattern': profile.usage_pattern,
+                    'yearly_consumption': profile.yearly_consumption,
+                    'monthly_distribution': profile.monthly_distribution,
+                    'surcharge_rate': profile.surcharge_rate,
+                    'max_daily_cycles': profile.max_daily_cycles,
+                    'max_charge_events': profile.max_charge_events,
+                    'max_discharge_events': profile.max_discharge_events
+                }
+            
+            with open(self.profile_file, 'w') as f:
+                json.dump(profiles_data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving profiles: {str(e)}")
     
     def save_schedule(self, schedule: Dict[str, Any]) -> None:
         try:
@@ -54,7 +134,7 @@ class ObjectStore:
                 raise ValueError("Invalid start_time format")
                 
             st.session_state.persist_schedules.append(schedule)
-            self._save_to_file()
+            self._save_schedules()
         except Exception as e:
             print(f"Error saving schedule: {str(e)}")
             raise
@@ -62,7 +142,7 @@ class ObjectStore:
     def remove_schedule(self, index: int) -> None:
         if 0 <= index < len(st.session_state.persist_schedules):
             st.session_state.persist_schedules.pop(index)
-            self._save_to_file()
+            self._save_schedules()
     
     def load_schedules(self) -> List[Dict[str, Any]]:
         current_date = datetime.now(timezone.utc).date()
@@ -72,8 +152,8 @@ class ObjectStore:
     
     def clear_schedules(self) -> None:
         st.session_state.persist_schedules = []
-        if os.path.exists(self.storage_file):
+        if os.path.exists(self.schedule_file):
             try:
-                os.remove(self.storage_file)
+                os.remove(self.schedule_file)
             except Exception as e:
                 print(f"Error clearing schedules: {str(e)}")
