@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.price_data import is_prices_available_for_tomorrow
+from utils.price_data import is_prices_available_for_tomorrow, get_price_forecast_confidence
 
 # Cache the base figure layout
 @st.cache_data(ttl=3600)
@@ -68,17 +68,36 @@ def get_base_figure_layout():
     }
 
 @st.cache_data(ttl=300)  # Cache color calculations for 5 minutes
-def get_price_colors(_dates):
-    """Calculate and cache price period colors"""
+def get_price_colors(_dates, _prices):
+    """Calculate and cache price period colors with extended timeline support"""
     colors = []
-    for date in _dates:
+    
+    # Calculate price percentiles for dynamic thresholds
+    price_75th = np.percentile(_prices, 75)
+    price_25th = np.percentile(_prices, 25)
+    
+    for date, price in zip(_dates, _prices):
         hour = date.hour
-        if hour in [7, 8, 9, 17, 18, 19, 20]:
-            colors.append("rgba(255, 99, 71, 0.3)")  # Peak
-        elif hour in [10, 11, 12, 13, 14, 15, 16]:
-            colors.append("rgba(255, 165, 0, 0.3)")  # Shoulder
+        confidence = get_price_forecast_confidence(date)
+        
+        # Dynamic color assignment based on both time and price
+        if price >= price_75th:
+            base_color = "rgba(255, 99, 71, {opacity})"  # Peak (red)
+        elif price <= price_25th:
+            base_color = "rgba(34, 139, 34, {opacity})"  # Off-peak (green)
         else:
-            colors.append("rgba(34, 139, 34, 0.3)")  # Off-peak
+            base_color = "rgba(255, 165, 0, {opacity})"  # Shoulder (orange)
+            
+        # Adjust opacity based on confidence and time period
+        if hour in [7, 8, 9, 17, 18, 19, 20]:
+            opacity = max(0.3, confidence * 0.8)  # Peak hours
+        elif hour in [10, 11, 12, 13, 14, 15, 16]:
+            opacity = max(0.25, confidence * 0.7)  # Shoulder hours
+        else:
+            opacity = max(0.2, confidence * 0.6)  # Off-peak hours
+            
+        colors.append(base_color.format(opacity=opacity))
+    
     return colors
 
 def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_stats=None):
@@ -87,11 +106,16 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     if not is_prices_available_for_tomorrow():
         st.warning("⚠️ Day-ahead prices for tomorrow will be available after 13:00 CET")
     
+    # Validate price data
+    if prices is None or len(prices) == 0:
+        st.error("No price data available for visualization")
+        return
+        
     # Create figure with cached base layout
     fig = go.Figure(layout=get_base_figure_layout())
     
-    # Get cached price period colors
-    colors = get_price_colors(prices.index)
+    # Get cached price period colors with price-sensitive coloring
+    colors = get_price_colors(prices.index, prices.values)
     
     # Add price bars with progressive loading for longer time periods
     chunk_size = 12  # Hours per chunk
@@ -101,16 +125,19 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         chunk_colors = colors[i:i + chunk_size]
         chunk_dates = prices.index[chunk_slice]
         
+        # Calculate confidence levels for each point
+        confidence_levels = [get_price_forecast_confidence(date) for date in chunk_dates]
+        
         fig.add_trace(go.Bar(
             x=chunk_dates,
             y=chunk_prices.values,
-            name="Energy Price" if i == 0 else None,  # Only show in legend once
+            name="Energy Price" if i == 0 else None,
             marker_color=chunk_colors,
-            marker_opacity=[get_price_forecast_confidence(date) for date in chunk_dates],
+            marker_opacity=confidence_levels,
             yaxis="y2",
             width=3600000,  # 1 hour in milliseconds
             hovertemplate="Time: %{x}<br>Price: €%{y:.3f}/kWh<br>Confidence: %{marker.opacity:.0%}<extra></extra>",
-            showlegend=(i == 0)  # Only show in legend for first chunk
+            showlegend=(i == 0)
         ))
     
     # Add charging/discharging visualization if schedule exists
@@ -165,7 +192,6 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         # Calculate timestamps and SOC values with bounds checking
         for i in range(len(prices)):
             start_soc = predicted_soc[i * points_per_hour]
-            # Get next SOC value, using the final value for the last period
             next_soc = predicted_soc[min((i + 1) * points_per_hour, len(predicted_soc) - 1)]
             
             for j in range(points_per_hour):
@@ -188,7 +214,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             predicted_soc[-1],
             battery.min_soc,
             battery.max_soc
-        ) * 100  # Convert to percentage
+        ) * 100
         
         timestamps.append(prices.index[-1])
         soc_values.append(final_soc)
@@ -210,26 +236,22 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     
     st.plotly_chart(fig, use_container_width=True)
     
-    # Add cached legends
-    st.markdown("""
-    ### Price Period Legend
-    - 🔴 **Peak Hours** (07:00-09:00, 17:00-20:00): Typically highest prices
-    - 🟠 **Shoulder Hours** (10:00-16:00): Moderate prices
-    - 🟢 **Off-peak Hours** (21:00-06:00): Usually lowest prices
-    """)
+    # Add cached legends with dynamic price thresholds
+    if len(prices) > 0:
+        price_75th = np.percentile(prices, 75)
+        price_25th = np.percentile(prices, 25)
+        st.markdown(f"""
+        ### Price Period Legend
+        - 🔴 **Peak Hours** (>€{price_75th:.3f}/kWh): Typically highest prices
+        - 🟠 **Shoulder Hours**: Moderate prices
+        - 🟢 **Off-peak Hours** (<€{price_25th:.3f}/kWh): Usually lowest prices
+        """)
     
     st.info("""
     📈 **Usage Pattern Information**
     - The black line shows actual home usage including hourly variations
     - Light blue bars indicate charging periods (buying energy)
     - Dark blue bars indicate discharging periods (using stored energy)
-    - Energy prices are shown as hourly blocks with reduced opacity to highlight charging patterns
+    - Energy prices are shown as hourly blocks with opacity indicating forecast confidence
     - Purple line shows predicted battery State of Charge (SOC) with smooth transitions
     """)
-
-def get_price_forecast_confidence(date):
-    """Get confidence level for price forecasts"""
-    current_time = datetime.now()
-    time_diff = (date - current_time).total_seconds() / 3600
-    confidence = 1 - abs(time_diff) / 24
-    return max(0, min(1, confidence))
