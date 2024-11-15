@@ -35,9 +35,10 @@ def calculate_price_thresholds(_effective_prices, _date):
     mask = pd.to_datetime(_effective_prices.index).date == target_date
     daily_prices = _effective_prices[mask]
     
-    # Calculate rolling statistics with 24-hour window
-    rolling_mean = daily_prices.rolling(window=24, min_periods=1, center=True).mean()
-    rolling_std = daily_prices.rolling(window=24, min_periods=1, center=True).std()
+    # Calculate rolling statistics with adaptive window for extended timelines
+    window_size = min(24, len(daily_prices))
+    rolling_mean = daily_prices.rolling(window=window_size, min_periods=1, center=True).mean()
+    rolling_std = daily_prices.rolling(window=window_size, min_periods=1, center=True).std()
     
     # Calculate dynamic thresholds
     charge_threshold = rolling_mean - 0.3 * rolling_std
@@ -64,7 +65,7 @@ def optimize_schedule(_prices, _battery):
     """
     periods = len(_prices)
     schedule = np.zeros(periods)
-    predicted_soc = np.zeros(periods * 4 + 1)
+    predicted_soc = np.zeros(periods * 4)  # Removed the +1 to fix alignment
     consumption_stats = analyze_consumption_patterns(_battery, _prices.index)
     
     # Calculate effective prices with reduced confidence weighting impact
@@ -74,7 +75,7 @@ def optimize_schedule(_prices, _battery):
         index=_prices.index
     )
     
-    # Pre-calculate daily thresholds
+    # Pre-calculate daily thresholds with extended timeline support
     daily_thresholds = {}
     for date in set(_prices.index.date):
         daily_thresholds[date] = calculate_price_thresholds(effective_prices, date)
@@ -113,8 +114,9 @@ def optimize_schedule(_prices, _battery):
         # Initialize schedule value for this period
         schedule[i] = 0
         
-        # Look ahead for better prices with less restrictive comparison
-        look_ahead_end = min(i + 4, periods)
+        # Look ahead for better prices with adaptive window for extended timelines
+        look_ahead_window = min(8, periods - i - 1)  # Increased look-ahead window
+        look_ahead_end = min(i + look_ahead_window, periods)
         future_prices = effective_prices.iloc[i+1:look_ahead_end]
         future_max_price = future_prices.mean() + 0.2 * future_prices.std() if len(future_prices) > 0 else 0
         
@@ -130,7 +132,7 @@ def optimize_schedule(_prices, _battery):
         
         if remaining_cycles > 0:
             # Charging decision with relative threshold
-            relative_charge_threshold = thresholds['rolling_mean'] * 1.05  # Allow charging up to 105% of rolling mean
+            relative_charge_threshold = thresholds['rolling_mean'] * 1.05
             if (current_price <= relative_charge_threshold and 
                 daily_events[current_date]['charge_events'] < _battery.max_charge_events and
                 available_capacity > 0):
@@ -145,8 +147,8 @@ def optimize_schedule(_prices, _battery):
                     daily_events[current_date]['cycles'] += max_allowed_charge / _battery.capacity
             
             # Discharging decision with relative threshold and future price comparison
-            elif (current_price >= thresholds['rolling_mean'] * 0.95 and  # Allow discharging at 95% of rolling mean
-                  current_price > future_max_price * 0.9 and  # Less restrictive future price comparison
+            elif (current_price >= thresholds['rolling_mean'] * 0.95 and
+                  current_price > future_max_price * 0.9 and
                   daily_events[current_date]['discharge_events'] < _battery.max_discharge_events and
                   available_discharge > 0):
                 max_allowed_discharge = min(
@@ -163,9 +165,9 @@ def optimize_schedule(_prices, _battery):
         strategic_change = schedule[i] / _battery.capacity
         total_change = strategic_change - consumption_impact
 
-        # Update intermediate points starting from the current hour
+        # Update intermediate points for the current hour
         for j in range(4):
-            point_index = i * 4 + j + 1
+            point_index = i * 4 + j
             if schedule[i] != 0:
                 # For charging/discharging, apply changes immediately at the start
                 if j == 0:
@@ -191,13 +193,5 @@ def optimize_schedule(_prices, _battery):
         
         # Ensure SOC stays within limits
         current_soc = np.clip(current_soc, _battery.min_soc, _battery.max_soc)
-        
-        # Set final SOC point if this is the last period
-        if i == periods - 1:
-            predicted_soc[-1] = np.clip(
-                current_soc + total_change,
-                _battery.min_soc,
-                _battery.max_soc
-            )
     
     return schedule, predicted_soc, consumption_stats
