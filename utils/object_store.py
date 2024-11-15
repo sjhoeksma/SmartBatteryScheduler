@@ -9,19 +9,30 @@ class ObjectStore:
     def __init__(self):
         self.schedule_file = 'schedules.json'
         self.profile_file = 'battery_profiles.json'
+        
+        # Initialize session state for schedules
         if 'persist_schedules' not in st.session_state:
-            st.session_state.persist_schedules = self._load_schedules()
+            try:
+                st.session_state.persist_schedules = self._load_schedules()
+            except Exception as e:
+                print(f"Error initializing schedules: {str(e)}")
+                st.session_state.persist_schedules = []
+        
+        # Initialize session state for profiles
         if 'profiles' not in st.session_state:
             st.session_state.profiles = {}
-            loaded_profiles = self._load_profiles()
-            for name, profile_data in loaded_profiles.items():
-                # Convert monthly_distribution keys to integers
-                if 'monthly_distribution' in profile_data:
-                    profile_data['monthly_distribution'] = {
-                        int(k): v for k, v in profile_data['monthly_distribution'].items()
-                    }
-                profile = BatteryProfile(**profile_data)
-                st.session_state.profiles[name] = profile
+            try:
+                loaded_profiles = self._load_profiles()
+                for name, profile_data in loaded_profiles.items():
+                    # Convert monthly_distribution keys to integers
+                    if 'monthly_distribution' in profile_data:
+                        profile_data['monthly_distribution'] = {
+                            int(k): v for k, v in profile_data['monthly_distribution'].items()
+                        }
+                    profile = BatteryProfile(**profile_data)
+                    st.session_state.profiles[name] = profile
+            except Exception as e:
+                print(f"Error loading profiles: {str(e)}")
             
             if not st.session_state.profiles:
                 # Create default profile if none exists
@@ -57,16 +68,20 @@ class ObjectStore:
                     # Convert string dates back to datetime with UTC timezone
                     for s in schedules:
                         try:
-                            dt = datetime.fromisoformat(s['start_time'])
-                            if dt.tzinfo is None:
-                                dt = dt.replace(tzinfo=timezone.utc)
-                            s['start_time'] = dt
-                        except (ValueError, TypeError):
+                            if isinstance(s.get('start_time'), str):
+                                dt = datetime.fromisoformat(s['start_time'].replace('Z', '+00:00'))
+                                if dt.tzinfo is None:
+                                    dt = dt.replace(tzinfo=timezone.utc)
+                                s['start_time'] = dt
+                        except (ValueError, TypeError) as e:
+                            print(f"Error parsing schedule date: {str(e)}")
                             continue
+                    
                     # Filter out expired and invalid schedules
                     current_date = datetime.now(timezone.utc).date()
                     return [s for s in schedules 
-                           if s.get('start_time') and s['start_time'].date() >= current_date]
+                           if isinstance(s.get('start_time'), datetime)
+                           and s['start_time'].date() >= current_date]
             except Exception as e:
                 print(f"Error loading schedules: {str(e)}")
                 return []
@@ -77,8 +92,9 @@ class ObjectStore:
         try:
             schedules = st.session_state.persist_schedules
             serializable_schedules = []
+            
             for s in schedules:
-                if s.get('start_time'):
+                if isinstance(s.get('start_time'), (datetime, time)):
                     s_copy = s.copy()
                     if isinstance(s_copy['start_time'], datetime):
                         # Ensure timezone information is preserved
@@ -96,8 +112,7 @@ class ObjectStore:
         if os.path.exists(self.profile_file):
             try:
                 with open(self.profile_file, 'r') as f:
-                    profiles = json.load(f)
-                    return profiles
+                    return json.load(f)
             except Exception as e:
                 print(f"Error loading profiles: {str(e)}")
                 return {}
@@ -163,6 +178,9 @@ class ObjectStore:
             else:
                 raise ValueError("Invalid start_time format")
             
+            if 'persist_schedules' not in st.session_state:
+                st.session_state.persist_schedules = []
+            
             st.session_state.persist_schedules.append(schedule)
             self._save_schedules()
         except Exception as e:
@@ -177,9 +195,12 @@ class ObjectStore:
     
     def load_schedules(self) -> List[Dict[str, Any]]:
         """Load and return active schedules"""
+        if 'persist_schedules' not in st.session_state:
+            st.session_state.persist_schedules = self._load_schedules()
+        
         current_date = datetime.now(timezone.utc).date()
         return [s for s in st.session_state.persist_schedules 
-                if isinstance(s.get('start_time'), datetime) 
+                if isinstance(s.get('start_time'), datetime)
                 and s['start_time'].date() >= current_date]
     
     def clear_schedules(self) -> None:

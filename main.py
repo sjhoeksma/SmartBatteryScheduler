@@ -28,12 +28,12 @@ def get_max_forecast_hours():
     now = datetime.now()
     publication_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
     if now >= publication_time:
-        # After 13:00 CET, we have tomorrow's prices plus additional forecast
-        return 48  # Extended to 48 hours
+        # After 13:00 CET, we have tomorrow's prices
+        return 36  # Changed from 48 to 36 hours
     else:
         # Before 13:00 CET, calculate remaining hours plus next day
         remaining_hours = 24 - now.hour
-        return max(24, remaining_hours + 24)  # Ensure at least 24 hours
+        return remaining_hours  # Only return remaining hours of current day
 
 # Cache price data with TTL based on forecast hours
 @st.cache_data(ttl=900)  # 15 minutes cache
