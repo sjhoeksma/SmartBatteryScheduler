@@ -77,7 +77,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         with col1:
             operation = st.selectbox(
                 get_text("operation"),
-                ["Charge", "Discharge"]
+                [get_text("operation_charge"), get_text("operation_discharge")]
             )
         
         with col2:
@@ -102,7 +102,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
             value=2
         )
         
-        if st.form_submit_button("Add Schedule"):
+        if st.form_submit_button(get_text("add_schedule")):
             new_schedule = {
                 'operation': operation,
                 'power': power,
