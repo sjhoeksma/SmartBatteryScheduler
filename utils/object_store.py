@@ -15,11 +15,22 @@ class ObjectStore:
             st.session_state.profiles = {}
             loaded_profiles = self._load_profiles()
             for name, profile_data in loaded_profiles.items():
+                # Convert monthly_distribution keys to integers
+                if 'monthly_distribution' in profile_data:
+                    profile_data['monthly_distribution'] = {
+                        int(k): v for k, v in profile_data['monthly_distribution'].items()
+                    }
                 profile = BatteryProfile(**profile_data)
                 st.session_state.profiles[name] = profile
             
             if not st.session_state.profiles:
                 # Create default profile if none exists
+                monthly_distribution = {
+                    int(k): v for k, v in {
+                        1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
+                        7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
+                    }.items()
+                }
                 default_profile = BatteryProfile(
                     name="Home Battery",
                     capacity=10.0,
@@ -29,10 +40,7 @@ class ObjectStore:
                     daily_consumption=15.0,
                     usage_pattern="Flat",
                     yearly_consumption=5475.0,
-                    monthly_distribution={
-                        1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
-                        7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
-                    },
+                    monthly_distribution=monthly_distribution,
                     surcharge_rate=0.050,
                     max_daily_cycles=1.5,
                     max_charge_events=2,
@@ -41,23 +49,31 @@ class ObjectStore:
                 self.save_profile(default_profile)
     
     def _load_schedules(self) -> List[Dict[str, Any]]:
+        """Load schedules from file with proper timezone handling"""
         if os.path.exists(self.schedule_file):
             try:
                 with open(self.schedule_file, 'r') as f:
                     schedules = json.load(f)
-                    # Convert string dates back to datetime with proper timezone handling
+                    # Convert string dates back to datetime with UTC timezone
                     for s in schedules:
                         try:
-                            s['start_time'] = datetime.fromisoformat(s['start_time'])
+                            dt = datetime.fromisoformat(s['start_time'])
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            s['start_time'] = dt
                         except (ValueError, TypeError):
                             continue
-                    return [s for s in schedules if s.get('start_time')]  # Filter out invalid entries
+                    # Filter out expired and invalid schedules
+                    current_date = datetime.now(timezone.utc).date()
+                    return [s for s in schedules 
+                           if s.get('start_time') and s['start_time'].date() >= current_date]
             except Exception as e:
                 print(f"Error loading schedules: {str(e)}")
                 return []
         return []
     
     def _save_schedules(self) -> None:
+        """Save schedules to file with proper timezone handling"""
         try:
             schedules = st.session_state.persist_schedules
             serializable_schedules = []
@@ -65,6 +81,9 @@ class ObjectStore:
                 if s.get('start_time'):
                     s_copy = s.copy()
                     if isinstance(s_copy['start_time'], datetime):
+                        # Ensure timezone information is preserved
+                        if s_copy['start_time'].tzinfo is None:
+                            s_copy['start_time'] = s_copy['start_time'].replace(tzinfo=timezone.utc)
                         s_copy['start_time'] = s_copy['start_time'].isoformat()
                     serializable_schedules.append(s_copy)
             
@@ -77,7 +96,8 @@ class ObjectStore:
         if os.path.exists(self.profile_file):
             try:
                 with open(self.profile_file, 'r') as f:
-                    return json.load(f)
+                    profiles = json.load(f)
+                    return profiles
             except Exception as e:
                 print(f"Error loading profiles: {str(e)}")
                 return {}
@@ -104,6 +124,10 @@ class ObjectStore:
         try:
             profiles_data = {}
             for name, profile in st.session_state.profiles.items():
+                # Ensure monthly_distribution has integer keys
+                monthly_distribution = {
+                    int(k): v for k, v in profile.monthly_distribution.items()
+                }
                 profiles_data[name] = {
                     'name': profile.name,
                     'capacity': profile.capacity,
@@ -113,7 +137,7 @@ class ObjectStore:
                     'daily_consumption': profile.daily_consumption,
                     'usage_pattern': profile.usage_pattern,
                     'yearly_consumption': profile.yearly_consumption,
-                    'monthly_distribution': profile.monthly_distribution,
+                    'monthly_distribution': monthly_distribution,
                     'surcharge_rate': profile.surcharge_rate,
                     'max_daily_cycles': profile.max_daily_cycles,
                     'max_charge_events': profile.max_charge_events,
@@ -126,13 +150,19 @@ class ObjectStore:
             print(f"Error saving profiles: {str(e)}")
     
     def save_schedule(self, schedule: Dict[str, Any]) -> None:
+        """Save a new schedule with proper timezone handling"""
         try:
             if isinstance(schedule['start_time'], time):
                 today = datetime.now(timezone.utc).date()
                 schedule['start_time'] = datetime.combine(today, schedule['start_time'])
-            elif not isinstance(schedule['start_time'], datetime):
+            
+            # Ensure datetime has timezone information
+            if isinstance(schedule['start_time'], datetime):
+                if schedule['start_time'].tzinfo is None:
+                    schedule['start_time'] = schedule['start_time'].replace(tzinfo=timezone.utc)
+            else:
                 raise ValueError("Invalid start_time format")
-                
+            
             st.session_state.persist_schedules.append(schedule)
             self._save_schedules()
         except Exception as e:
@@ -140,17 +170,20 @@ class ObjectStore:
             raise
     
     def remove_schedule(self, index: int) -> None:
+        """Remove a schedule by index"""
         if 0 <= index < len(st.session_state.persist_schedules):
             st.session_state.persist_schedules.pop(index)
             self._save_schedules()
     
     def load_schedules(self) -> List[Dict[str, Any]]:
+        """Load and return active schedules"""
         current_date = datetime.now(timezone.utc).date()
         return [s for s in st.session_state.persist_schedules 
                 if isinstance(s.get('start_time'), datetime) 
                 and s['start_time'].date() >= current_date]
     
     def clear_schedules(self) -> None:
+        """Clear all schedules"""
         st.session_state.persist_schedules = []
         if os.path.exists(self.schedule_file):
             try:

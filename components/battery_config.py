@@ -6,9 +6,20 @@ from utils.translations import get_text
 from utils.object_store import ObjectStore
 
 def render_monthly_distribution(monthly_distribution):
-    """Render monthly distribution visualization"""
     months = list(range(1, 13))
-    factors = [monthly_distribution[m] for m in months]
+    # Handle None case and ensure integer keys
+    if monthly_distribution is None:
+        monthly_distribution = {
+            1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
+            7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
+        }
+    else:
+        # Ensure all keys are integers
+        monthly_distribution = {
+            int(k): float(v) for k, v in monthly_distribution.items()
+        }
+    
+    factors = [monthly_distribution.get(m, 1.0) for m in months]
     
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -22,8 +33,9 @@ def render_monthly_distribution(monthly_distribution):
         title=get_text("monthly_distribution_title"),
         xaxis_title=get_text("month"),
         yaxis_title=get_text("consumption_factor"),
-        xaxis=dict(tickmode='array', ticktext=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        xaxis=dict(tickmode='array', 
+                  ticktext=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                   tickvals=months)
     )
     return fig

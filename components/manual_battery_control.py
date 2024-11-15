@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from utils.translations import get_text
 from components.price_chart import render_price_chart
 from utils.object_store import ObjectStore
@@ -33,7 +33,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         st.metric(get_text("battery_power"), 
                  f"{abs(current_power):.1f} kW",
                  delta=get_text("charging") if current_power > 0 else get_text("discharging") if current_power < 0 else "Idle")
-
+    
     # Immediate control section
     st.markdown("### " + get_text("immediate_control"))
     
@@ -108,110 +108,127 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         )
         
         if st.form_submit_button(get_text("add_schedule")):
+            # Create datetime with proper timezone
+            today = datetime.now(timezone.utc).date()
+            start_datetime = datetime.combine(today, start_time).replace(tzinfo=timezone.utc)
+            
+            # If start time is earlier than current time, schedule for tomorrow
+            current_time = datetime.now(timezone.utc)
+            if start_datetime <= current_time:
+                start_datetime += timedelta(days=1)
+            
             new_schedule = {
                 'operation': operation,
                 'power': power,
-                'start_time': start_time,
+                'start_time': start_datetime,
                 'duration': duration,
                 'status': 'Manual'
             }
             st.session_state.store.save_schedule(new_schedule)
             st.session_state.battery_schedules = st.session_state.store.load_schedules()
-            st.success(get_text("schedule_added"))
+            st.success("Schedule added successfully!")
     
     # Display schedules
-    if st.session_state.battery_schedules or (schedule is not None and prices is not None):
-        st.markdown("### " + get_text("scheduled_operations"))
+    st.markdown("### " + get_text("scheduled_operations"))
+    
+    # Process all schedules (manual and optimized)
+    schedule_data = []
+    current_time = datetime.now(timezone.utc)
+    
+    # Process manual schedules
+    manual_schedules = st.session_state.battery_schedules
+    for idx, schedule_entry in enumerate(manual_schedules):
+        start_datetime = schedule_entry['start_time']
+        if start_datetime.tzinfo is None:
+            start_datetime = start_datetime.replace(tzinfo=timezone.utc)
+        end_datetime = start_datetime + timedelta(hours=schedule_entry['duration'])
         
-        schedule_data = []
-        current_time = datetime.now()
+        status = get_text("scheduled")
+        if current_time > end_datetime:
+            status = get_text("completed")
+        elif current_time >= start_datetime:
+            status = get_text("in_progress")
         
-        # Process manual schedules
-        for schedule_entry in st.session_state.battery_schedules:
-            start_datetime = schedule_entry['start_time']
-            end_datetime = start_datetime + timedelta(hours=schedule_entry['duration'])
-            
-            status = get_text("scheduled")
-            if current_time > end_datetime:
-                status = get_text("completed")
-            elif current_time >= start_datetime:
-                status = get_text("in_progress")
-            
-            schedule_data.append({
-                get_text("operation"): schedule_entry['operation'],
-                get_text("power_kw"): schedule_entry['power'],
-                get_text("start_time"): start_datetime.strftime('%H:%M'),
-                get_text("duration_hours"): schedule_entry['duration'],
-                'End Time': end_datetime.strftime('%H:%M'),
-                'Status': status,
-                'Type': 'Manual'
-            })
+        schedule_data.append({
+            'idx': idx,  # Store original index for deletion
+            get_text("operation"): schedule_entry['operation'],
+            get_text("power_kw"): schedule_entry['power'],
+            get_text("start_time"): start_datetime.strftime('%Y-%m-%d %H:%M'),
+            get_text("duration_hours"): schedule_entry['duration'],
+            'End Time': end_datetime.strftime('%Y-%m-%d %H:%M'),
+            'Status': status,
+            'Type': 'Manual'
+        })
+    
+    # Process optimization schedule if available
+    if schedule is not None and prices is not None:
+        current_operation = None
+        start_idx = 0
+        power_threshold = 0.1  # Minimum power threshold (kW)
         
-        # Process optimization schedule if available
-        if schedule is not None and prices is not None:
-            current_operation = None
-            start_idx = 0
-            power_threshold = 0.1  # Minimum power threshold (kW)
-            
-            for i, power in enumerate(schedule):
-                if abs(power) > power_threshold:
-                    if current_operation is None or (power > 0) != (current_operation['power'] > 0):
-                        if current_operation is not None and abs(current_operation['power']) > power_threshold:
-                            duration = i - start_idx
-                            if duration > 0:
-                                start_time = prices.index[start_idx]
-                                end_time = prices.index[min(start_idx + duration, len(prices.index) - 1)]
-                                
-                                schedule_data.append({
-                                    get_text('operation'): get_text('operation_charge') if current_operation['power'] > 0 
-                                                    else get_text('operation_discharge'),
-                                    get_text('power_kw'): abs(current_operation['power']),
-                                    get_text('start_time'): start_time.strftime('%H:%M'),
-                                    get_text('duration_hours'): duration,
-                                    'End Time': end_time.strftime('%H:%M'),
-                                    'Status': 'Optimized',
-                                    'Type': 'Optimized'
-                                })
-                        
-                        current_operation = {'power': power}
-                        start_idx = i
-
-        # Create DataFrame for both manual and optimized schedules
-        if schedule_data:
-            schedule_df = pd.DataFrame(schedule_data)
-            
-            # Sort schedules by start time
-            schedule_df['start_time'] = pd.to_datetime(schedule_df[get_text('start_time')], format='%H:%M').dt.time
-            schedule_df = schedule_df.sort_values('start_time')
-            
-            # Display all schedules in a table
-            st.dataframe(
-                schedule_df[[
-                    get_text('operation'),
-                    get_text('power_kw'),
-                    get_text('start_time'),
-                    get_text('duration_hours'),
-                    'End Time',
-                    'Status',
-                    'Type'
-                ]],
-                hide_index=True
-            )
-            
-            # Add delete buttons for manual schedules
-            if not schedule_df.empty:
-                for idx, row in schedule_df.iterrows():
-                    if row['Type'] == 'Manual':  # Only allow deletion of manual schedules
-                        col1, col2 = st.columns([0.9, 0.1])
-                        with col1:
-                            st.write(f"{row[get_text('operation')]} - {row[get_text('power_kw')]}kW - {row[get_text('start_time')]} ({row[get_text('duration_hours')]}h)")
-                        with col2:
-                            if st.button('🗑️', key=f'delete_{idx}'):
-                                st.session_state.store.remove_schedule(idx)
-                                st.session_state.battery_schedules = st.session_state.store.load_schedules()
-                                st.rerun()
+        for i, power in enumerate(schedule):
+            if abs(power) > power_threshold:
+                if current_operation is None or (power > 0) != (current_operation['power'] > 0):
+                    if current_operation is not None and abs(current_operation['power']) > power_threshold:
+                        duration = i - start_idx
+                        if duration > 0:
+                            start_time = prices.index[start_idx]
+                            if start_time.tzinfo is None:
+                                start_time = start_time.replace(tzinfo=timezone.utc)
+                            end_time = prices.index[min(start_idx + duration, len(prices.index) - 1)]
+                            if end_time.tzinfo is None:
+                                end_time = end_time.replace(tzinfo=timezone.utc)
+                            
+                            schedule_data.append({
+                                'idx': None,  # No index for optimized schedules
+                                get_text('operation'): get_text('operation_charge') if current_operation['power'] > 0 
+                                                else get_text('operation_discharge'),
+                                get_text('power_kw'): abs(current_operation['power']),
+                                get_text('start_time'): start_time.strftime('%Y-%m-%d %H:%M'),
+                                get_text('duration_hours'): duration,
+                                'End Time': end_time.strftime('%Y-%m-%d %H:%M'),
+                                'Status': 'Optimized',
+                                'Type': 'Optimized'
+                            })
+                    
+                    current_operation = {'power': power}
+                    start_idx = i
+    
+    # Create DataFrame and sort schedules
+    if schedule_data:
+        schedule_df = pd.DataFrame(schedule_data)
+        schedule_df['start_time_dt'] = pd.to_datetime(schedule_df[get_text('start_time')])
+        schedule_df = schedule_df.sort_values('start_time_dt')
+        
+        # Display schedules in a table
+        display_df = schedule_df[[
+            get_text('operation'),
+            get_text('power_kw'),
+            get_text('start_time'),
+            get_text('duration_hours'),
+            'End Time',
+            'Status',
+            'Type'
+        ]].copy()
+        
+        st.dataframe(display_df, hide_index=True)
+        
+        # Add delete buttons for manual schedules
+        manual_schedules = schedule_df[schedule_df['Type'] == 'Manual']
+        if not manual_schedules.empty:
+            st.markdown("#### Manage Manual Schedules")
+            for _, row in manual_schedules.iterrows():
+                col1, col2 = st.columns([0.9, 0.1])
+                with col1:
+                    st.write(f"{row[get_text('operation')]} - {row[get_text('power_kw')]}kW - {row[get_text('start_time')]} ({row[get_text('duration_hours')]}h)")
+                with col2:
+                    if st.button('🗑️', key=f'delete_{row["idx"]}'):
+                        st.session_state.store.remove_schedule(int(row['idx']))
+                        st.session_state.battery_schedules = st.session_state.store.load_schedules()
+                        st.rerun()
             
             if st.button(get_text("clear_all_schedules")):
                 st.session_state.store.clear_schedules()
                 st.session_state.battery_schedules = []
                 st.success(get_text("schedules_cleared"))
+                st.rerun()
