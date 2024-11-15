@@ -85,6 +85,21 @@ def main():
         get_text("cost_calculator")
     ])
     
+    # Get cached price forecast and optimization results
+    try:
+        prices = get_cached_prices(st.session_state.forecast_hours)
+        if st.session_state.battery:
+            schedule, predicted_soc, consumption_stats = get_cached_optimization(
+                prices,
+                st.session_state.battery
+            )
+    except Exception as e:
+        st.error(f"Error updating price data: {str(e)}")
+        prices = None
+        schedule = None
+        predicted_soc = None
+        consumption_stats = None
+    
     with tab1:
         col1, col2 = st.columns([2, 1])
         
@@ -106,20 +121,10 @@ def main():
                 st.session_state.forecast_hours = forecast_hours
                 st.cache_data.clear()
             
-            try:
-                # Get cached price forecast and optimization results
-                prices = get_cached_prices(forecast_hours)
-                if st.session_state.battery:
-                    schedule, predicted_soc, consumption_stats = get_cached_optimization(
-                        prices,
-                        st.session_state.battery
-                    )
-                    render_price_chart(prices, schedule, predicted_soc, consumption_stats)
-                else:
-                    render_price_chart(prices)
-            except Exception as e:
-                st.error(f"Error updating price data: {str(e)}")
-                st.info("Please try adjusting the forecast hours or refresh the page.")
+            if prices is not None and st.session_state.battery:
+                render_price_chart(prices, schedule, predicted_soc, consumption_stats)
+            else:
+                render_price_chart(prices)
 
         with col2:
             st.subheader(get_text("battery_config"))
@@ -131,7 +136,13 @@ def main():
     
     with tab2:
         if st.session_state.battery:
-            render_manual_battery_control(st.session_state.battery)
+            render_manual_battery_control(
+                st.session_state.battery,
+                prices=prices,
+                schedule=schedule,
+                predicted_soc=predicted_soc,
+                consumption_stats=consumption_stats
+            )
         else:
             st.warning(get_text("configure_battery_first"))
     

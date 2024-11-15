@@ -2,10 +2,16 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from utils.translations import get_text
+from components.price_chart import render_price_chart
 
-def render_manual_battery_control(battery):
+def render_manual_battery_control(battery, prices=None, schedule=None, predicted_soc=None, consumption_stats=None):
     """Render manual battery control interface with scheduling"""
     st.subheader(get_text("manual_control"))
+    
+    # Display prediction chart if data is available
+    if prices is not None:
+        st.markdown("### " + get_text("price_and_prediction"))
+        render_price_chart(prices, schedule, predicted_soc, consumption_stats)
     
     # Display current battery status
     col1, col2, col3 = st.columns(3)
