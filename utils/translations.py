@@ -76,6 +76,10 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Charge",
         nl="Opladen"
     ),
+    "operation_discharge": Translation(
+        en="Discharge",
+        nl="Ontladen"
+    ),
     "power_kw": Translation(
         en="Power (kW)",
         nl="Vermogen (kW)"
@@ -83,6 +87,10 @@ TRANSLATIONS: Dict[str, Translation] = {
     "start_time": Translation(
         en="Start Time",
         nl="Starttijd"
+    ),
+    "duration_hours": Translation(
+        en="Duration (hours)",
+        nl="Duur (uren)"
     ),
     "add_schedule": Translation(
         en="Add Schedule",
