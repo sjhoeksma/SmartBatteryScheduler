@@ -8,7 +8,7 @@ class ObjectStore:
             st.session_state.schedules = []
     
     def save_schedule(self, schedule: Dict[str, Any]) -> None:
-        if isinstance(schedule['start_time'], type(datetime.time())):
+        if isinstance(schedule['start_time'], datetime.time):  # Compare directly with datetime.time
             today = datetime.today().date()
             schedule['start_time'] = datetime.combine(today, schedule['start_time'])
         st.session_state.schedules.append(schedule)
