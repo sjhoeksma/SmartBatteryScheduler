@@ -22,14 +22,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Cache price data for better performance with variable TTL based on forecast hours
-@st.cache_data(ttl=1800)  # Cache for 30 minutes
+# Cache price data with fixed TTL based on forecast hours range
+@st.cache_data(ttl=1800)  # 30 minutes cache
 def get_cached_prices(forecast_hours):
-    """Get cached price data with variable cache duration"""
+    """Get cached price data with extended forecast support"""
     return get_day_ahead_prices(forecast_hours=forecast_hours)
 
-# Cache optimization results
-@st.cache_data(ttl=900)  # Cache for 15 minutes
+# Cache optimization results with fixed TTL
+@st.cache_data(ttl=900)  # 15 minutes cache
 def get_cached_optimization(_prices, _battery):
     """Get cached optimization results"""
     return optimize_schedule(_prices, _battery)
@@ -46,19 +46,20 @@ def main():
     
     if 'battery' not in st.session_state:
         default_profile = st.session_state.profile_manager.get_profile("Home Battery")
-        st.session_state.battery = Battery(
-            capacity=default_profile.capacity,
-            min_soc=default_profile.min_soc,
-            max_soc=default_profile.max_soc,
-            charge_rate=default_profile.charge_rate,
-            profile_name="Home Battery",
-            daily_consumption=default_profile.daily_consumption,
-            usage_pattern=default_profile.usage_pattern,
-            yearly_consumption=default_profile.yearly_consumption,
-            monthly_distribution=default_profile.monthly_distribution
-        )
+        if default_profile:
+            st.session_state.battery = Battery(
+                capacity=default_profile.capacity,
+                min_soc=default_profile.min_soc,
+                max_soc=default_profile.max_soc,
+                charge_rate=default_profile.charge_rate,
+                profile_name="Home Battery",
+                daily_consumption=default_profile.daily_consumption,
+                usage_pattern=default_profile.usage_pattern,
+                yearly_consumption=default_profile.yearly_consumption,
+                monthly_distribution=default_profile.monthly_distribution
+            )
     
-    # Initialize forecast hours with default value
+    # Initialize forecast hours with extended default value
     if 'forecast_hours' not in st.session_state:
         st.session_state.forecast_hours = 36
     
@@ -76,30 +77,32 @@ def main():
         with col1:
             st.subheader("Energy Price and Charging Schedule")
             
-            # Add forecast hours selector with hour-by-hour adjustments
+            # Add forecast hours selector with extended range
             forecast_hours = st.slider(
                 "Forecast Hours",
                 min_value=12,
-                max_value=36,
+                max_value=48,  # Extended maximum
                 value=st.session_state.forecast_hours,
                 step=1,
-                help="Select number of hours to forecast (12-36 hours, adjustable by hour)"
+                help="Select number of hours to forecast (12-48 hours, adjustable by hour)"
             )
             
             if forecast_hours != st.session_state.forecast_hours:
                 st.session_state.forecast_hours = forecast_hours
-                # Clear the cache for the current parameters
-                get_cached_prices.clear()
-                get_cached_optimization.clear()
+                # Clear relevant caches
+                st.cache_data.clear()
             
             try:
                 # Get cached price forecast and optimization results
                 prices = get_cached_prices(forecast_hours)
-                schedule, predicted_soc, consumption_stats = get_cached_optimization(
-                    prices,
-                    st.session_state.battery
-                )
-                render_price_chart(prices, schedule, predicted_soc, consumption_stats)
+                if st.session_state.battery:
+                    schedule, predicted_soc, consumption_stats = get_cached_optimization(
+                        prices,
+                        st.session_state.battery
+                    )
+                    render_price_chart(prices, schedule, predicted_soc, consumption_stats)
+                else:
+                    render_price_chart(prices)
             except Exception as e:
                 st.error(f"Error updating price data: {str(e)}")
                 st.info("Please try adjusting the forecast hours or refresh the page.")
@@ -108,20 +111,24 @@ def main():
             st.subheader(get_text("battery_config"))
             render_battery_config()
             
-            st.subheader(get_text("battery_status"))
-            render_battery_status(st.session_state.battery)
+            if st.session_state.battery:
+                st.subheader(get_text("battery_status"))
+                render_battery_status(st.session_state.battery)
     
     with tab2:
-        render_power_flow(st.session_state.battery)
+        if st.session_state.battery:
+            render_power_flow(st.session_state.battery)
     
     with tab3:
         st.subheader(get_text("historical_analysis"))
         historical_prices = generate_historical_prices(days=30)
-        render_historical_analysis(historical_prices, st.session_state.battery)
+        if st.session_state.battery:
+            render_historical_analysis(historical_prices, st.session_state.battery)
         
     with tab4:
-        historical_prices = generate_historical_prices(days=30)
-        render_cost_calculator(historical_prices, st.session_state.battery)
+        if st.session_state.battery:
+            historical_prices = generate_historical_prices(days=30)
+            render_cost_calculator(historical_prices, st.session_state.battery)
 
 if __name__ == "__main__":
     main()
