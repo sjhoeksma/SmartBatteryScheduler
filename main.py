@@ -69,7 +69,11 @@ def main():
                 daily_consumption=default_profile.daily_consumption,
                 usage_pattern=default_profile.usage_pattern,
                 yearly_consumption=default_profile.yearly_consumption,
-                monthly_distribution=default_profile.monthly_distribution
+                monthly_distribution=default_profile.monthly_distribution,
+                max_daily_cycles=default_profile.max_daily_cycles,
+                max_charge_events=default_profile.max_charge_events,
+                max_discharge_events=default_profile.max_discharge_events,
+                surcharge_rate=default_profile.surcharge_rate
             )
     
     # Initialize forecast hours with default value
@@ -124,8 +128,8 @@ def main():
             if prices is not None and st.session_state.battery:
                 render_price_chart(prices, schedule, predicted_soc, consumption_stats)
             else:
-                render_price_chart(prices)
-
+                st.warning("No price data available")
+        
         with col2:
             st.subheader(get_text("battery_config"))
             render_battery_config()
