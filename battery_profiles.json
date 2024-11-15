@@ -27,14 +27,14 @@
     "max_charge_events": 2,
     "max_discharge_events": 1
   },
-  "Ecos": {
-    "name": "Ecos",
-    "capacity": 13.5,
-    "min_soc": 0.1,
+  "ECOS": {
+    "name": "ECOS",
+    "capacity": 40.0,
+    "min_soc": 0.2,
     "max_soc": 0.9,
-    "charge_rate": 5.0,
+    "charge_rate": 3.7,
     "daily_consumption": 15.0,
-    "usage_pattern": "Day-heavy",
+    "usage_pattern": "Flat",
     "yearly_consumption": 5475.0,
     "monthly_distribution": {
       "1": 1.2,

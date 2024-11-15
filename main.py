@@ -78,7 +78,31 @@ def main():
     
     # Initialize forecast hours with default value
     if 'forecast_hours' not in st.session_state:
-        st.session_state.forecast_hours = 24
+        st.session_state.forecast_hours = get_max_forecast_hours()
+    
+    # Initialize variables
+    prices = None
+    schedule = None
+    predicted_soc = None
+    consumption_stats = None
+    
+    # Get cached price forecast and optimization results
+    try:
+        # Update forecast hours if needed
+        forecast_hours = get_max_forecast_hours()
+        if forecast_hours != st.session_state.forecast_hours:
+            st.session_state.forecast_hours = forecast_hours
+            st.cache_data.clear()
+        
+        # Get prices and optimization results
+        prices = get_cached_prices(st.session_state.forecast_hours)
+        if prices is not None and st.session_state.battery:
+            schedule, predicted_soc, consumption_stats = get_cached_optimization(
+                prices,
+                st.session_state.battery
+            )
+    except Exception as e:
+        st.error(f"Error updating price data: {str(e)}")
     
     # Layout
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -89,41 +113,11 @@ def main():
         get_text("cost_calculator")
     ])
     
-    # Get cached price forecast and optimization results
-    try:
-        prices = get_cached_prices(st.session_state.forecast_hours)
-        if st.session_state.battery:
-            schedule, predicted_soc, consumption_stats = get_cached_optimization(
-                prices,
-                st.session_state.battery
-            )
-    except Exception as e:
-        st.error(f"Error updating price data: {str(e)}")
-        prices = None
-        schedule = None
-        predicted_soc = None
-        consumption_stats = None
-    
     with tab1:
         col1, col2 = st.columns([2, 1])
         
         with col1:
             st.subheader("Energy Price and Charging Schedule")
-            
-            # Add forecast hours selector with dynamic maximum
-            max_hours = get_max_forecast_hours()
-            forecast_hours = st.slider(
-                "Forecast Hours",
-                min_value=12,
-                max_value=max_hours,
-                value=min(st.session_state.forecast_hours, max_hours),
-                step=1,
-                help=f"Select number of hours to forecast (12-{max_hours} hours)"
-            )
-            
-            if forecast_hours != st.session_state.forecast_hours:
-                st.session_state.forecast_hours = forecast_hours
-                st.cache_data.clear()
             
             if prices is not None and st.session_state.battery:
                 render_price_chart(prices, schedule, predicted_soc, consumption_stats)
@@ -148,22 +142,27 @@ def main():
                 consumption_stats=consumption_stats
             )
         else:
-            st.warning(get_text("configure_battery_first"))
+            st.warning("Please configure battery settings first")
     
     with tab3:
         if st.session_state.battery:
             render_power_flow(st.session_state.battery)
+        else:
+            st.warning("Please configure battery settings first")
     
     with tab4:
         st.subheader(get_text("historical_analysis"))
         historical_prices = generate_historical_prices(days=30)
         if st.session_state.battery:
             render_historical_analysis(historical_prices, st.session_state.battery)
-        
+        else:
+            st.warning("Please configure battery settings first")
+    
     with tab5:
-        if st.session_state.battery:
-            historical_prices = generate_historical_prices(days=30)
+        if st.session_state.battery and historical_prices is not None:
             render_cost_calculator(historical_prices, st.session_state.battery)
+        else:
+            st.warning("Please configure battery settings first")
 
 if __name__ == "__main__":
     main()
