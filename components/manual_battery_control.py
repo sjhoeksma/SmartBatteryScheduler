@@ -8,6 +8,10 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
     """Render manual battery control interface with scheduling"""
     st.subheader(get_text("manual_control"))
     
+    # Initialize session state for schedules if not exists
+    if 'battery_schedules' not in st.session_state:
+        st.session_state.battery_schedules = []
+    
     # Display prediction chart if data is available
     if prices is not None:
         st.markdown("### " + get_text("price_and_prediction"))
@@ -66,10 +70,6 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
     # Schedule section
     st.markdown("### " + get_text("schedule_control"))
     
-    # Initialize session state for schedules if not exists
-    if 'battery_schedules' not in st.session_state:
-        st.session_state.battery_schedules = []
-    
     # Add new schedule
     with st.form("add_schedule"):
         col1, col2, col3 = st.columns(3)
@@ -108,44 +108,96 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                 'power': power,
                 'start_time': start_time,
                 'duration': duration,
-                'status': 'Scheduled'
+                'status': 'Manual'
             }
             st.session_state.battery_schedules.append(new_schedule)
             st.success(get_text("schedule_added"))
     
     # Display schedules
-    if st.session_state.battery_schedules:
+    if st.session_state.battery_schedules or (schedule is not None and prices is not None):
         st.markdown("### " + get_text("scheduled_operations"))
         
-        # Convert schedules to DataFrame for display
         schedule_data = []
         current_time = datetime.now().time()
         
-        for schedule in st.session_state.battery_schedules:
-            # Calculate end time
-            start_datetime = datetime.combine(datetime.today(), schedule['start_time'])
-            end_time = (start_datetime + timedelta(hours=schedule['duration'])).time()
+        # Process manual schedules
+        for schedule_entry in st.session_state.battery_schedules:
+            start_datetime = datetime.combine(datetime.today(), schedule_entry['start_time'])
+            end_time = (start_datetime + timedelta(hours=schedule_entry['duration'])).time()
             
-            # Update status based on time
-            if current_time < schedule['start_time']:
-                status = get_text("scheduled")
-            elif schedule['start_time'] <= current_time <= end_time:
-                status = get_text("in_progress")
-            else:
+            status = get_text("scheduled")
+            if current_time > end_time:
                 status = get_text("completed")
+            elif current_time >= schedule_entry['start_time']:
+                status = get_text("in_progress")
             
             schedule_data.append({
-                get_text("operation"): schedule['operation'],
-                get_text("power_kw"): schedule['power'],
-                get_text("start_time"): schedule['start_time'].strftime('%H:%M'),
-                get_text("duration_hours"): schedule['duration'],
+                get_text("operation"): schedule_entry['operation'],
+                get_text("power_kw"): schedule_entry['power'],
+                get_text("start_time"): schedule_entry['start_time'].strftime('%H:%M'),
+                get_text("duration_hours"): schedule_entry['duration'],
                 'End Time': end_time.strftime('%H:%M'),
-                'Status': status
+                'Status': status,
+                'Type': 'Manual'
             })
         
-        schedule_df = pd.DataFrame(schedule_data)
-        st.dataframe(schedule_df, use_container_width=True)
+        # Process optimization schedule if available
+        if schedule is not None and prices is not None:
+            current_operation = None
+            start_idx = 0
+            
+            for i, power in enumerate(schedule):
+                if power != 0:
+                    # New operation starts or operation type changes
+                    if current_operation is None or (power > 0) != (current_operation['power'] > 0):
+                        # Add previous operation if exists
+                        if current_operation is not None:
+                            duration = i - start_idx
+                            if duration > 0:  # Only add if duration is positive
+                                start_time = prices.index[start_idx].time()
+                                end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)].time()
+                                
+                                schedule_data.append({
+                                    get_text("operation"): get_text("operation_charge") if current_operation['power'] > 0 
+                                                      else get_text("operation_discharge"),
+                                    get_text("power_kw"): abs(current_operation['power']),
+                                    get_text("start_time"): start_time.strftime('%H:%M'),
+                                    get_text("duration_hours"): duration,
+                                    'End Time': end_time.strftime('%H:%M'),
+                                    'Status': 'Optimized',
+                                    'Type': 'Optimized'
+                                })
+                        
+                        # Start new operation
+                        current_operation = {'power': power}
+                        start_idx = i
+                
+                # Update power if same operation continues
+                elif current_operation is not None:
+                    current_operation['power'] = power
+            
+            # Add last operation if exists
+            if current_operation is not None:
+                duration = len(schedule) - start_idx
+                if duration > 0:  # Only add if duration is positive
+                    start_time = prices.index[start_idx].time()
+                    end_time = prices.index[min(start_idx + duration - 1, len(prices.index) - 1)].time()
+                    
+                    schedule_data.append({
+                        get_text("operation"): get_text("operation_charge") if current_operation['power'] > 0 
+                                          else get_text("operation_discharge"),
+                        get_text("power_kw"): abs(current_operation['power']),
+                        get_text("start_time"): start_time.strftime('%H:%M'),
+                        get_text("duration_hours"): duration,
+                        'End Time': end_time.strftime('%H:%M'),
+                        'Status': 'Optimized',
+                        'Type': 'Optimized'
+                    })
         
-        if st.button(get_text("clear_all_schedules")):
-            st.session_state.battery_schedules = []
-            st.success(get_text("schedules_cleared"))
+        if schedule_data:
+            schedule_df = pd.DataFrame(schedule_data)
+            st.dataframe(schedule_df, use_container_width=True)
+            
+            if st.button(get_text("clear_all_schedules")):
+                st.session_state.battery_schedules = []
+                st.success(get_text("schedules_cleared"))
