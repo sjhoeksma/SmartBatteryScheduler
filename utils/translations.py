@@ -496,6 +496,14 @@ TRANSLATIONS: Dict[str, Translation] = {
         en="Set the minimum and maximum number of charge/discharge cycles per day",
         nl="Stel het minimum en maximum aantal laad/ontlaadcycli per dag in"
     ),
+    "scheduled": Translation(
+        en="Scheduled",
+        nl="Gepland"
+    ),
+    "completed": Translation(
+        en="Completed",
+        nl="Voltooid"
+    ),
 }
 
 def get_browser_language() -> str:
