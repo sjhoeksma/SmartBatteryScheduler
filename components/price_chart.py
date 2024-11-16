@@ -194,7 +194,11 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             
             # Calculate SOC change immediately when charging/discharging occurs
             strategic_change = schedule[i] / _battery.capacity
-            total_change = strategic_change - consumption_stats[i] / _battery.capacity
+            
+            # Get consumption value for current timestamp
+            current_timestamp = prices.index[i]
+            consumption_value = consumption_stats.loc[consumption_stats['date'] == current_timestamp.date(), 'consumption'].iloc[0]
+            total_change = strategic_change - (consumption_value / (24 * _battery.capacity))  # Divide by 24 for hourly consumption
             
             # Update intermediate points for the current hour
             for j in range(points_per_hour):
