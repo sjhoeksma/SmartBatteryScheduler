@@ -9,8 +9,8 @@ from utils.battery_profiles import BatteryProfile
 class ObjectStore:
 
     def __init__(self):
-        self.schedule_file = 'schedules.json'
-        self.profile_file = 'battery_profiles.json'
+        self.schedule_file = '.DB/schedules.json'
+        self.profile_file = '.DB/battery_profiles.json'
 
         # Initialize session state for schedules
         if 'persist_schedules' not in st.session_state:
