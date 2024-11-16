@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 import numpy as np
 
+
 @dataclass
 class BatteryProfile:
     name: str
@@ -13,12 +14,13 @@ class BatteryProfile:
     daily_consumption: float = 15.0  # Default daily consumption in kWh
     usage_pattern: str = "Flat"  # Default usage pattern
     yearly_consumption: float = 5475.0  # Default yearly consumption (15 kWh * 365)
-    monthly_distribution: Dict[int, float] = None  # Monthly consumption distribution factors
+    monthly_distribution: Dict[
+        int, float] = None  # Monthly consumption distribution factors
     surcharge_rate: float = 0.05  # Default surcharge rate in €/kWh
     max_daily_cycles: float = 1.5  # Default maximum daily cycles
     max_charge_events: int = 2  # Default max charging events per day
     max_discharge_events: int = 1  # Default max discharging events per day
-    
+
     def __post_init__(self):
         if self.monthly_distribution is None:
             # Initialize with default seasonal distribution
@@ -27,9 +29,9 @@ class BatteryProfile:
                 2: 1.15,
                 3: 1.0,
                 4: 0.9,
-                5: 0.8,
-                6: 0.7,  # Summer
-                7: 0.7,
+                5: 0.5,
+                6: 0.4,  # Summer
+                7: 0.5,
                 8: 0.7,
                 9: 0.8,
                 10: 0.9,
@@ -47,74 +49,75 @@ class BatteryProfile:
         seasonal_factor = self.get_seasonal_factor(month)
         return yearly_daily_avg * seasonal_factor
 
+
 class BatteryProfileManager:
+
     def __init__(self):
         self.profiles: Dict[str, BatteryProfile] = {}
         self._load_default_profiles()
-    
+
     def _load_default_profiles(self):
         """Load default battery profiles"""
         defaults = {
-            "Home Battery": BatteryProfile(
-                name="Home Battery",
-                capacity=13.5,
-                min_soc=0.1,
-                max_soc=0.9,
-                charge_rate=5.0,
-                daily_consumption=15.0,
-                usage_pattern="Day-heavy",
-                yearly_consumption=5475.0,
-                surcharge_rate=0.05,
-                max_daily_cycles=1.5,
-                max_charge_events=2,
-                max_discharge_events=1
-            ),
-            "EV Battery": BatteryProfile(
-                name="EV Battery",
-                capacity=75.0,
-                min_soc=0.2,
-                max_soc=0.8,
-                charge_rate=11.0,
-                daily_consumption=20.0,
-                usage_pattern="Night-heavy",
-                yearly_consumption=7300.0,
-                surcharge_rate=0.08,
-                max_daily_cycles=1.0,
-                max_charge_events=1,
-                max_discharge_events=1
-            ),
-            "Small Battery": BatteryProfile(
-                name="Small Battery",
-                capacity=5.0,
-                min_soc=0.15,
-                max_soc=0.85,
-                charge_rate=3.3,
-                daily_consumption=8.0,
-                usage_pattern="Flat",
-                yearly_consumption=2920.0,
-                surcharge_rate=0.05,
-                max_daily_cycles=2.0,
-                max_charge_events=3,
-                max_discharge_events=2
-            )
+            "Home Battery":
+            BatteryProfile(name="Home Battery",
+                           capacity=20,
+                           min_soc=0.2,
+                           max_soc=0.9,
+                           charge_rate=12.0,
+                           daily_consumption=9.0,
+                           usage_pattern="Day-heavy",
+                           yearly_consumption=3475.0,
+                           surcharge_rate=0.030,
+                           max_daily_cycles=1.5,
+                           max_charge_events=2,
+                           max_discharge_events=1),
+            "EV Battery":
+            BatteryProfile(name="EV Battery",
+                           capacity=75.0,
+                           min_soc=0.2,
+                           max_soc=0.8,
+                           charge_rate=11.0,
+                           daily_consumption=20.0,
+                           usage_pattern="Night-heavy",
+                           yearly_consumption=7300.0,
+                           surcharge_rate=0.03,
+                           max_daily_cycles=2.0,
+                           max_charge_events=1,
+                           max_discharge_events=1),
+            "Small Battery":
+            BatteryProfile(name="Small Battery",
+                           capacity=5.0,
+                           min_soc=0.15,
+                           max_soc=0.85,
+                           charge_rate=3.3,
+                           daily_consumption=8.0,
+                           usage_pattern="Flat",
+                           yearly_consumption=2920.0,
+                           surcharge_rate=0.03,
+                           max_daily_cycles=2.0,
+                           max_charge_events=3,
+                           max_discharge_events=2)
         }
         self.profiles.update(defaults)
-    
+
     def add_profile(self, profile: BatteryProfile) -> None:
         """Add or update a battery profile"""
         self.profiles[profile.name] = profile
-    
+
     def get_profile(self, name: str) -> Optional[BatteryProfile]:
         """Get a battery profile by name"""
         return self.profiles.get(name)
-    
+
     def list_profiles(self) -> list[str]:
         """List all available profile names"""
         return list(self.profiles.keys())
-    
+
     def delete_profile(self, name: str) -> bool:
         """Delete a battery profile"""
-        if name in self.profiles and name not in ["Home Battery", "EV Battery", "Small Battery"]:
+        if name in self.profiles and name not in [
+                "Home Battery", "EV Battery", "Small Battery"
+        ]:
             del self.profiles[name]
             return True
         return False

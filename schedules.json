@@ -1,9 +1,0 @@
-[
-  {
-    "operation": "Charge",
-    "power": 2.5,
-    "start_time": "2024-11-15T19:00:00",
-    "duration": 2,
-    "status": "Manual"
-  }
-]

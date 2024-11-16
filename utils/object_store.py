@@ -5,11 +5,13 @@ from typing import List, Dict, Any
 import streamlit as st
 from utils.battery_profiles import BatteryProfile
 
+
 class ObjectStore:
+
     def __init__(self):
         self.schedule_file = 'schedules.json'
         self.profile_file = 'battery_profiles.json'
-        
+
         # Initialize session state for schedules
         if 'persist_schedules' not in st.session_state:
             try:
@@ -17,7 +19,7 @@ class ObjectStore:
             except Exception as e:
                 print(f"Error initializing schedules: {str(e)}")
                 st.session_state.persist_schedules = []
-        
+
         # Initialize session state for profiles
         if 'profiles' not in st.session_state:
             st.session_state.profiles = {}
@@ -27,38 +29,50 @@ class ObjectStore:
                     # Convert monthly_distribution keys to integers
                     if 'monthly_distribution' in profile_data:
                         profile_data['monthly_distribution'] = {
-                            int(k): v for k, v in profile_data['monthly_distribution'].items()
+                            int(k): v
+                            for k, v in
+                            profile_data['monthly_distribution'].items()
                         }
                     profile = BatteryProfile(**profile_data)
                     st.session_state.profiles[name] = profile
             except Exception as e:
                 print(f"Error loading profiles: {str(e)}")
-            
+
             if not st.session_state.profiles:
                 # Create default profile if none exists
                 monthly_distribution = {
-                    int(k): v for k, v in {
-                        1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8, 6: 0.7,
-                        7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.0, 12: 1.15
+                    int(k): v
+                    for k, v in {
+                        1: 1.2,
+                        2: 1.15,
+                        3: 1.0,
+                        4: 0.9,
+                        5: 0.5,
+                        6: 0.4,
+                        7: 0.4,
+                        8: 0.5,
+                        9: 0.7,
+                        10: 0.9,
+                        11: 1.0,
+                        12: 1.15
                     }.items()
                 }
                 default_profile = BatteryProfile(
                     name="Home Battery",
-                    capacity=10.0,
+                    capacity=20.0,
                     min_soc=0.2,
                     max_soc=0.9,
-                    charge_rate=3.7,
+                    charge_rate=12,
                     daily_consumption=15.0,
                     usage_pattern="Flat",
-                    yearly_consumption=5475.0,
+                    yearly_consumption=3475.0,
                     monthly_distribution=monthly_distribution,
-                    surcharge_rate=0.050,
+                    surcharge_rate=0.025,
                     max_daily_cycles=1.5,
                     max_charge_events=2,
-                    max_discharge_events=1
-                )
+                    max_discharge_events=1)
                 self.save_profile(default_profile)
-    
+
     def _load_schedules(self) -> List[Dict[str, Any]]:
         """Load schedules from file with proper timezone handling"""
         if os.path.exists(self.schedule_file):
@@ -69,46 +83,48 @@ class ObjectStore:
                     for s in schedules:
                         try:
                             if isinstance(s.get('start_time'), str):
-                                dt = datetime.fromisoformat(s['start_time'].replace('Z', '+00:00'))
+                                dt = datetime.fromisoformat(
+                                    s['start_time'].replace('Z', '+00:00'))
                                 if dt.tzinfo is None:
                                     dt = dt.replace(tzinfo=timezone.utc)
                                 s['start_time'] = dt
                         except (ValueError, TypeError) as e:
                             print(f"Error parsing schedule date: {str(e)}")
                             continue
-                    
+
                     # Filter out expired and invalid schedules
                     current_date = datetime.now(timezone.utc).date()
                     valid_schedules = []
                     for s in schedules:
-                        if (isinstance(s.get('start_time'), datetime) and 
-                            s['start_time'].date() >= current_date and
-                            isinstance(s.get('power'), (int, float)) and
-                            isinstance(s.get('duration'), (int, float)) and
-                            isinstance(s.get('operation'), str)):
+                        if (isinstance(s.get('start_time'), datetime)
+                                and s['start_time'].date() >= current_date
+                                and isinstance(s.get('power'), (int, float))
+                                and isinstance(s.get('duration'), (int, float))
+                                and isinstance(s.get('operation'), str)):
                             valid_schedules.append(s)
                     return valid_schedules
             except Exception as e:
                 print(f"Error loading schedules: {str(e)}")
                 return []
         return []
-    
+
     def _save_schedules(self) -> None:
         """Save schedules to file with proper timezone handling"""
         try:
             schedules = st.session_state.persist_schedules
             serializable_schedules = []
-            
+
             for s in schedules:
                 if isinstance(s.get('start_time'), (datetime, time)):
                     s_copy = s.copy()
                     if isinstance(s_copy['start_time'], datetime):
                         # Ensure timezone information is preserved
                         if s_copy['start_time'].tzinfo is None:
-                            s_copy['start_time'] = s_copy['start_time'].replace(tzinfo=timezone.utc)
+                            s_copy['start_time'] = s_copy[
+                                'start_time'].replace(tzinfo=timezone.utc)
                         s_copy['start_time'] = s_copy['start_time'].isoformat()
                     serializable_schedules.append(s_copy)
-            
+
             with open(self.schedule_file, 'w') as f:
                 json.dump(serializable_schedules, f, indent=2)
         except Exception as e:
@@ -139,7 +155,8 @@ class ObjectStore:
         return st.session_state.profiles.get(name)
 
     def list_profiles(self) -> List[str]:
-        return list(st.session_state.profiles.keys()) if 'profiles' in st.session_state else []
+        return list(st.session_state.profiles.keys()
+                    ) if 'profiles' in st.session_state else []
 
     def _save_profiles_to_file(self) -> None:
         try:
@@ -147,7 +164,8 @@ class ObjectStore:
             for name, profile in st.session_state.profiles.items():
                 # Ensure monthly_distribution has integer keys
                 monthly_distribution = {
-                    int(k): v for k, v in profile.monthly_distribution.items()
+                    int(k): v
+                    for k, v in profile.monthly_distribution.items()
                 }
                 profiles_data[name] = {
                     'name': profile.name,
@@ -164,19 +182,22 @@ class ObjectStore:
                     'max_charge_events': profile.max_charge_events,
                     'max_discharge_events': profile.max_discharge_events
                 }
-            
+
             with open(self.profile_file, 'w') as f:
                 json.dump(profiles_data, f, indent=2)
         except Exception as e:
             print(f"Error saving profiles: {str(e)}")
-    
+
     def save_schedule(self, schedule: Dict[str, Any]) -> None:
         """Save a new schedule with proper timezone handling and validation"""
         try:
             # Validate schedule data
-            if not all(k in schedule for k in ['operation', 'power', 'start_time', 'duration']):
-                raise ValueError("Invalid schedule format: missing required fields")
-            
+            if not all(
+                    k in schedule
+                    for k in ['operation', 'power', 'start_time', 'duration']):
+                raise ValueError(
+                    "Invalid schedule format: missing required fields")
+
             # Validate data types
             if not isinstance(schedule.get('power'), (int, float)):
                 raise ValueError("Power must be a number")
@@ -184,64 +205,66 @@ class ObjectStore:
                 raise ValueError("Duration must be a number")
             if not isinstance(schedule.get('operation'), str):
                 raise ValueError("Operation must be a string")
-            
+
             # Handle time conversion
             if isinstance(schedule['start_time'], time):
                 today = datetime.now(timezone.utc).date()
-                schedule['start_time'] = datetime.combine(today, schedule['start_time'])
-            
+                schedule['start_time'] = datetime.combine(
+                    today, schedule['start_time'])
+
             # Ensure datetime has timezone information
             if isinstance(schedule['start_time'], datetime):
                 if schedule['start_time'].tzinfo is None:
-                    schedule['start_time'] = schedule['start_time'].replace(tzinfo=timezone.utc)
+                    schedule['start_time'] = schedule['start_time'].replace(
+                        tzinfo=timezone.utc)
             else:
                 raise ValueError("Invalid start_time format")
-            
+
             # Initialize persist_schedules if not exists
             if 'persist_schedules' not in st.session_state:
                 st.session_state.persist_schedules = []
-            
+
             # Ensure numeric values are of correct type
             schedule['power'] = float(schedule['power'])
             schedule['duration'] = int(schedule['duration'])
-            
+
             # Add status if not present
             if 'status' not in schedule:
                 schedule['status'] = 'scheduled'
-            
+
             # Add schedule and save
             st.session_state.persist_schedules.append(schedule)
             self._save_schedules()
-            
+
         except Exception as e:
             print(f"Error saving schedule: {str(e)}")
             raise
-    
+
     def remove_schedule(self, index: int) -> None:
         """Remove a schedule by index"""
         if 0 <= index < len(st.session_state.persist_schedules):
             st.session_state.persist_schedules.pop(index)
             self._save_schedules()
-    
+
     def load_schedules(self) -> List[Dict[str, Any]]:
         """Load and return active schedules"""
         if 'persist_schedules' not in st.session_state:
             st.session_state.persist_schedules = self._load_schedules()
-        
+
         # Validate and filter schedules
         current_date = datetime.now(timezone.utc).date()
         valid_schedules = []
         for s in st.session_state.persist_schedules:
-            if (isinstance(s.get('start_time'), datetime) and 
-                s['start_time'].date() >= current_date and
-                isinstance(s.get('power'), (int, float)) and
-                isinstance(s.get('duration'), (int, float)) and
-                isinstance(s.get('operation'), str)):
+            if (isinstance(s.get('start_time'), datetime)
+                    and s['start_time'].date() >= current_date
+                    and isinstance(s.get('power'), (int, float))
+                    and isinstance(s.get('duration'), (int, float))
+                    and isinstance(s.get('operation'), str)):
                 valid_schedules.append(s)
-        
+
         st.session_state.persist_schedules = valid_schedules
         return valid_schedules
-    
+
     def clear_schedules(self) -> None:
         """Clear all schedules"""
         st.session_state.persist_schedules = []
