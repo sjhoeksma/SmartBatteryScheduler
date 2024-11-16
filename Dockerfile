@@ -3,6 +3,8 @@ FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
+# Create DB directory
+RUN mkdir -p /app/.DB
 
 # Copy requirements
 COPY pyproject.toml .
@@ -10,6 +12,7 @@ COPY main.py .
 COPY components/ components/
 COPY utils/ utils/
 COPY .streamlit/ .streamlit/
+
 
 # Install dependencies
 RUN pip install --no-cache-dir streamlit pandas numpy plotly
