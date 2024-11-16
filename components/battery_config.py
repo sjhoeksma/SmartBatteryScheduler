@@ -6,6 +6,7 @@ from utils.translations import get_text
 from utils.object_store import ObjectStore
 
 def render_monthly_distribution(monthly_distribution):
+    """Render monthly distribution visualization"""
     months = list(range(1, 13))
     # Handle None case and ensure integer keys
     if monthly_distribution is None:
@@ -58,14 +59,19 @@ def render_battery_config():
     if current_profile_name not in profiles:
         current_profile_name = "Home Battery"
     
+    # Add profile selection persistence
+    if 'current_profile' not in st.session_state:
+        st.session_state.current_profile = current_profile_name
+    
     # Profile selection with delete button
     col1, col2 = st.columns([3, 1])
     with col1:
         current_profile = st.selectbox(
             get_text("battery_profile"),
             profiles,
-            index=profiles.index(current_profile_name)
+            index=profiles.index(st.session_state.current_profile)
         )
+        st.session_state.current_profile = current_profile
     with col2:
         if st.button("🗑️ Delete Profile", key="delete_profile"):
             if current_profile != "Home Battery":  # Prevent deletion of default profile
@@ -195,7 +201,7 @@ def render_battery_config():
                 max_discharge_events=max_discharge_events
             )
             
-            # Save updated profile to store
+            # Save updated profile and update battery instance
             st.session_state.store.save_profile(updated_profile)
             
             # Update battery instance
@@ -214,6 +220,9 @@ def render_battery_config():
                 max_charge_events=max_charge_events,
                 max_discharge_events=max_discharge_events
             )
+            
+            # Clear optimization cache to force schedule recalculation
+            st.cache_data.clear()
             st.success(get_text("config_updated"))
     
     # New profile creation
@@ -256,6 +265,9 @@ def render_battery_config():
                     max_charge_events=max_charge_events,
                     max_discharge_events=max_discharge_events
                 )
+                
+                # Clear optimization cache to force schedule recalculation
+                st.cache_data.clear()
                 st.success(get_text("profile_created").format(new_name))
                 st.rerun()  # Rerun to show updated profile selection
             else:

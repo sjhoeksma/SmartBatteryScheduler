@@ -4,7 +4,7 @@
     "capacity": 40.0,
     "min_soc": 0.2,
     "max_soc": 0.9,
-    "charge_rate": 3.7,
+    "charge_rate": 16.0,
     "daily_consumption": 15.0,
     "usage_pattern": "Flat",
     "yearly_consumption": 5475.0,
