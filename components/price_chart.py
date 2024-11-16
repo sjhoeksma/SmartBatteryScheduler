@@ -195,14 +195,11 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             # Calculate SOC change immediately when charging/discharging occurs
             strategic_change = schedule[i] / _battery.capacity
             
-            # Get consumption value for current timestamp with fallback
-            try:
-                matching_rows = consumption_stats[consumption_stats['date'] == current_timestamp.date()]
-                consumption_value = matching_rows['consumption'].iloc[0] if not matching_rows.empty else _battery.get_daily_consumption_for_date(current_timestamp) / 24
-            except (IndexError, KeyError, AttributeError):
-                # Fallback to battery's consumption calculation
-                consumption_value = _battery.get_daily_consumption_for_date(current_timestamp) / 24
-
+            # Get current timestamp from prices dataframe
+            current_date = prices.index[i].date()
+            matching_rows = consumption_stats[consumption_stats['date'] == current_date]
+            consumption_value = matching_rows['consumption'].iloc[0] if not matching_rows.empty else _battery.get_daily_consumption_for_date(prices.index[i]) / 24
+            
             # Calculate total change with hourly consumption
             total_change = strategic_change - (consumption_value / _battery.capacity)
             
