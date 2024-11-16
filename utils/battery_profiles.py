@@ -8,6 +8,7 @@ import numpy as np
 class BatteryProfile:
     name: str
     capacity: float
+    empty_soc: float
     min_soc: float
     max_soc: float
     charge_rate: float
@@ -62,6 +63,7 @@ class BatteryProfileManager:
             "Home Battery":
             BatteryProfile(name="Home Battery",
                            capacity=20,
+                           empty_soc=0.1,
                            min_soc=0.2,
                            max_soc=0.9,
                            charge_rate=12.0,
@@ -75,6 +77,7 @@ class BatteryProfileManager:
             "EV Battery":
             BatteryProfile(name="EV Battery",
                            capacity=75.0,
+                           empty_soc=0.1,
                            min_soc=0.2,
                            max_soc=0.8,
                            charge_rate=11.0,
@@ -88,6 +91,7 @@ class BatteryProfileManager:
             "Small Battery":
             BatteryProfile(name="Small Battery",
                            capacity=5.0,
+                           empty_soc=0.1,
                            min_soc=0.15,
                            max_soc=0.85,
                            charge_rate=3.3,

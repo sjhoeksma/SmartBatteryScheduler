@@ -60,6 +60,7 @@ class ObjectStore:
                 default_profile = BatteryProfile(
                     name="Home Battery",
                     capacity=20.0,
+                    empty_soc=0.1,
                     min_soc=0.2,
                     max_soc=0.9,
                     charge_rate=12,
@@ -170,6 +171,7 @@ class ObjectStore:
                 profiles_data[name] = {
                     'name': profile.name,
                     'capacity': profile.capacity,
+                    'empty_soc': profile.empty_soc,
                     'min_soc': profile.min_soc,
                     'max_soc': profile.max_soc,
                     'charge_rate': profile.charge_rate,

@@ -45,7 +45,7 @@ def get_base_figure_layout():
              anchor="free",
              overlaying="y",
              side="right",
-             position=0.88,
+             position=0.90,
              range=[0, 100]),
         'plot_bgcolor':
         "white",
@@ -187,7 +187,7 @@ def render_price_chart(prices,
                         x=prices.index[charge_mask],
                         y=schedule_array[charge_mask],
                         name="Charging",
-                        marker_color="rgba(52, 152, 219, 0.98)",
+                        marker_color="rgba(0, 154, 0, 0.98)",
                         width=3600000,
                         hovertemplate=
                         "Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"))
@@ -198,7 +198,7 @@ def render_price_chart(prices,
                         x=prices.index[discharge_mask],
                         y=schedule_array[discharge_mask],
                         name="Discharging",
-                        marker_color="rgba(41, 128, 185, 0.98)",
+                        marker_color="rgba(255, 0, 0, 0.98)",
                         width=3600000,
                         hovertemplate=
                         "Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"

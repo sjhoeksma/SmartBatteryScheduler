@@ -68,3 +68,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 * Fix issue in battery.py that it used the day "use patern" predicted or base on model. Now its hard coded
 * Consumptions stats in optimizer.py are strange at 0.15
+* Add support for Car loading algorithm

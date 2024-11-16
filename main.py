@@ -58,6 +58,7 @@ def main():
         if default_profile:
             st.session_state.battery = Battery(
                 capacity=default_profile.capacity,
+                empty_soc=default_profile.empty_soc,
                 min_soc=default_profile.min_soc,
                 max_soc=default_profile.max_soc,
                 charge_rate=default_profile.charge_rate,

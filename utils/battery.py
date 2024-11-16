@@ -7,6 +7,7 @@ class Battery:
 
     def __init__(self,
                  capacity,
+                 empty_soc,
                  min_soc,
                  max_soc,
                  charge_rate,
@@ -20,10 +21,10 @@ class Battery:
                  max_charge_events=2,
                  max_discharge_events=1):
         self.capacity = capacity
+        self.empty_soc = empty_soc
         self.min_soc = min_soc
         self.max_soc = max_soc
         self.charge_rate = charge_rate
-        self.current_soc = 0.5  # Start at 50%
         self.profile_name = profile_name
         self.daily_consumption = daily_consumption
         self.usage_pattern = usage_pattern
@@ -53,8 +54,10 @@ class Battery:
         self._last_reset = datetime.now().date()
         try:
             self.ecactus_client = get_ecactus_client()
+            self.current_soc = self.ecactus_client.get_current_soc()
         except ValueError:
             self.ecactus_client = None
+            self.current_soc = 0.6
 
     def _reset_daily_counters_if_needed(self):
         """Reset daily counters if it's a new day"""

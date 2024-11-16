@@ -8,7 +8,7 @@ class EcactusClient:
     def get_battery_status(self):
         """Stub implementation of battery status"""
         return {
-            'soc': 0.65,  # 65% charge
+            'soc': 0.45,  # 65% charge
             'power': 2.5,  # 2.5 kW charging
             'temperature': 25.0,  # 25°C
             'voltage': 230.0  # 230V
