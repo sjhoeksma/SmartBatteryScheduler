@@ -88,13 +88,13 @@ def get_price_colors(_dates, _prices):
         else:
             base_color = "rgba(255, 165, 0, {opacity})"  # Shoulder (orange)
             
-        # Adjust opacity based on confidence and time period
+        # Updated opacity settings for better visualization
         if hour in [7, 8, 9, 17, 18, 19, 20]:
-            opacity = max(0.3, confidence * 0.8)  # Peak hours
+            opacity = max(0.15, confidence * 0.4)  # Peak hours (more transparent)
         elif hour in [10, 11, 12, 13, 14, 15, 16]:
-            opacity = max(0.25, confidence * 0.7)  # Shoulder hours
+            opacity = max(0.1, confidence * 0.3)   # Shoulder hours (more transparent)
         else:
-            opacity = max(0.2, confidence * 0.6)  # Off-peak hours
+            opacity = max(0.08, confidence * 0.25)  # Off-peak hours (more transparent)
             
         colors.append(base_color.format(opacity=opacity))
     
@@ -117,7 +117,7 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
     # Get cached price period colors with price-sensitive coloring
     colors = get_price_colors(prices.index, prices.values)
     
-    # Add price bars with progressive loading for longer time periods
+    # Add price bars first (for proper rendering order)
     chunk_size = 12  # Hours per chunk
     for i in range(0, len(prices), chunk_size):
         chunk_slice = slice(i, i + chunk_size)
@@ -140,31 +140,6 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             showlegend=(i == 0)
         ))
     
-    # Add charging/discharging visualization if schedule exists
-    if schedule is not None:
-        charge_mask = schedule > 0
-        discharge_mask = schedule < 0
-        
-        if any(charge_mask):
-            fig.add_trace(go.Bar(
-                x=prices.index[charge_mask],
-                y=schedule[charge_mask],
-                name="Charging",
-                marker_color="rgba(52, 152, 219, 0.9)",
-                width=3600000,
-                hovertemplate="Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"
-            ))
-        
-        if any(discharge_mask):
-            fig.add_trace(go.Bar(
-                x=prices.index[discharge_mask],
-                y=schedule[discharge_mask],
-                name="Discharging",
-                marker_color="rgba(41, 128, 185, 0.9)",
-                width=3600000,
-                hovertemplate="Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
-            ))
-    
     # Add home usage line if battery is in session state
     if 'battery' in st.session_state:
         battery = st.session_state.battery
@@ -180,16 +155,39 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             hovertemplate="Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"
         ))
     
+    # Add charging/discharging visualization with increased opacity
+    if schedule is not None:
+        charge_mask = schedule > 0
+        discharge_mask = schedule < 0
+        
+        if any(charge_mask):
+            fig.add_trace(go.Bar(
+                x=prices.index[charge_mask],
+                y=schedule[charge_mask],
+                name="Charging",
+                marker_color="rgba(52, 152, 219, 0.98)",  # Updated opacity (more prominent)
+                width=3600000,
+                hovertemplate="Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"
+            ))
+        
+        if any(discharge_mask):
+            fig.add_trace(go.Bar(
+                x=prices.index[discharge_mask],
+                y=schedule[discharge_mask],
+                name="Discharging",
+                marker_color="rgba(41, 128, 185, 0.98)",  # Updated opacity (more prominent)
+                width=3600000,
+                hovertemplate="Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
+            ))
+    
     # Add SOC prediction with optimized point calculation and bounds checking
     if predicted_soc is not None and 'battery' in st.session_state:
         battery = st.session_state.battery
         timestamps = []
         soc_values = []
         
-        # Use fewer interpolation points for longer time periods
         points_per_hour = 4 if len(prices) <= 24 else 2
         
-        # Calculate timestamps and SOC values with bounds checking
         for i in range(len(prices)):
             start_soc = predicted_soc[i * points_per_hour]
             next_soc = predicted_soc[min((i + 1) * points_per_hour, len(predicted_soc) - 1)]
@@ -199,17 +197,15 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
                 alpha = j / points_per_hour
                 interpolated_soc = start_soc + (next_soc - start_soc) * alpha
                 
-                # Ensure SOC stays within battery limits
                 bounded_soc = np.clip(
                     interpolated_soc,
                     battery.min_soc,
                     battery.max_soc
-                ) * 100  # Convert to percentage
+                ) * 100
                 
                 timestamps.append(point_time)
                 soc_values.append(bounded_soc)
         
-        # Add final point with proper bounds checking
         final_soc = np.clip(
             predicted_soc[-1],
             battery.min_soc,
@@ -234,7 +230,8 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
             hovertemplate="Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"
         ))
     
-    st.plotly_chart(fig, use_container_width=True)
+    # Add unique key to plotly chart to fix StreamlitDuplicateElementId error
+    st.plotly_chart(fig, use_container_width=True, key=f"price_chart_{datetime.now().timestamp()}")
     
     # Add cached legends with dynamic price thresholds
     if len(prices) > 0:

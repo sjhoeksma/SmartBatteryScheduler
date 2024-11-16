@@ -79,9 +79,15 @@ class ObjectStore:
                     
                     # Filter out expired and invalid schedules
                     current_date = datetime.now(timezone.utc).date()
-                    return [s for s in schedules 
-                           if isinstance(s.get('start_time'), datetime)
-                           and s['start_time'].date() >= current_date]
+                    valid_schedules = []
+                    for s in schedules:
+                        if (isinstance(s.get('start_time'), datetime) and 
+                            s['start_time'].date() >= current_date and
+                            isinstance(s.get('power'), (int, float)) and
+                            isinstance(s.get('duration'), (int, float)) and
+                            isinstance(s.get('operation'), str)):
+                            valid_schedules.append(s)
+                    return valid_schedules
             except Exception as e:
                 print(f"Error loading schedules: {str(e)}")
                 return []
@@ -167,6 +173,10 @@ class ObjectStore:
     def save_schedule(self, schedule: Dict[str, Any]) -> None:
         """Save a new schedule with proper timezone handling"""
         try:
+            # Validate schedule data
+            if not all(k in schedule for k in ['operation', 'power', 'start_time', 'duration']):
+                raise ValueError("Invalid schedule format: missing required fields")
+                
             if isinstance(schedule['start_time'], time):
                 today = datetime.now(timezone.utc).date()
                 schedule['start_time'] = datetime.combine(today, schedule['start_time'])
@@ -180,6 +190,10 @@ class ObjectStore:
             
             if 'persist_schedules' not in st.session_state:
                 st.session_state.persist_schedules = []
+            
+            # Ensure power and duration are numeric
+            schedule['power'] = float(schedule['power'])
+            schedule['duration'] = int(schedule['duration'])
             
             st.session_state.persist_schedules.append(schedule)
             self._save_schedules()
@@ -198,10 +212,19 @@ class ObjectStore:
         if 'persist_schedules' not in st.session_state:
             st.session_state.persist_schedules = self._load_schedules()
         
+        # Validate and filter schedules
         current_date = datetime.now(timezone.utc).date()
-        return [s for s in st.session_state.persist_schedules 
-                if isinstance(s.get('start_time'), datetime)
-                and s['start_time'].date() >= current_date]
+        valid_schedules = []
+        for s in st.session_state.persist_schedules:
+            if (isinstance(s.get('start_time'), datetime) and 
+                s['start_time'].date() >= current_date and
+                isinstance(s.get('power'), (int, float)) and
+                isinstance(s.get('duration'), (int, float)) and
+                isinstance(s.get('operation'), str)):
+                valid_schedules.append(s)
+        
+        st.session_state.persist_schedules = valid_schedules
+        return valid_schedules
     
     def clear_schedules(self) -> None:
         """Clear all schedules"""
