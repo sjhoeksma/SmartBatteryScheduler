@@ -171,12 +171,21 @@ class ObjectStore:
             print(f"Error saving profiles: {str(e)}")
     
     def save_schedule(self, schedule: Dict[str, Any]) -> None:
-        """Save a new schedule with proper timezone handling"""
+        """Save a new schedule with proper timezone handling and validation"""
         try:
             # Validate schedule data
             if not all(k in schedule for k in ['operation', 'power', 'start_time', 'duration']):
                 raise ValueError("Invalid schedule format: missing required fields")
-                
+            
+            # Validate data types
+            if not isinstance(schedule.get('power'), (int, float)):
+                raise ValueError("Power must be a number")
+            if not isinstance(schedule.get('duration'), (int, float)):
+                raise ValueError("Duration must be a number")
+            if not isinstance(schedule.get('operation'), str):
+                raise ValueError("Operation must be a string")
+            
+            # Handle time conversion
             if isinstance(schedule['start_time'], time):
                 today = datetime.now(timezone.utc).date()
                 schedule['start_time'] = datetime.combine(today, schedule['start_time'])
@@ -188,15 +197,22 @@ class ObjectStore:
             else:
                 raise ValueError("Invalid start_time format")
             
+            # Initialize persist_schedules if not exists
             if 'persist_schedules' not in st.session_state:
                 st.session_state.persist_schedules = []
             
-            # Ensure power and duration are numeric
+            # Ensure numeric values are of correct type
             schedule['power'] = float(schedule['power'])
             schedule['duration'] = int(schedule['duration'])
             
+            # Add status if not present
+            if 'status' not in schedule:
+                schedule['status'] = 'scheduled'
+            
+            # Add schedule and save
             st.session_state.persist_schedules.append(schedule)
             self._save_schedules()
+            
         except Exception as e:
             print(f"Error saving schedule: {str(e)}")
             raise

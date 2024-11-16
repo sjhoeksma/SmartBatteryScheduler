@@ -189,31 +189,41 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         points_per_hour = 4 if len(prices) <= 24 else 2
         
         for i in range(len(prices)):
-            start_soc = predicted_soc[i * points_per_hour]
-            next_soc = predicted_soc[min((i + 1) * points_per_hour, len(predicted_soc) - 1)]
+            current_soc = predicted_soc[min((i - 1) * points_per_hour, len(predicted_soc) - 1)]
+            _battery = st.session_state.battery
             
+            # Calculate SOC change immediately when charging/discharging occurs
+            strategic_change = schedule[i] / _battery.capacity
+            total_change = strategic_change - consumption_stats[i] / _battery.capacity
+            
+            # Update intermediate points for the current hour
             for j in range(points_per_hour):
-                point_time = prices.index[i] + timedelta(minutes=(60 // points_per_hour) * j)
-                alpha = j / points_per_hour
-                interpolated_soc = start_soc + (next_soc - start_soc) * alpha
-                
-                bounded_soc = np.clip(
-                    interpolated_soc,
-                    battery.min_soc,
-                    battery.max_soc
-                ) * 100
-                
-                timestamps.append(point_time)
-                soc_values.append(bounded_soc)
-        
-        final_soc = np.clip(
-            predicted_soc[-1],
-            battery.min_soc,
-            battery.max_soc
-        ) * 100
-        
-        timestamps.append(prices.index[-1])
-        soc_values.append(final_soc)
+                point_index = i * points_per_hour + j
+                if point_index < len(predicted_soc):  # Ensure we don't exceed array bounds
+                    if schedule[i] != 0:
+                        # For charging/discharging, apply full change immediately
+                        predicted_soc[point_index] = current_soc + total_change
+                    else:
+                        # For consumption-only periods, keep gradual change
+                        alpha = (j + 1) / points_per_hour
+                        predicted_soc[point_index] = current_soc + (total_change * alpha)
+                    
+                    # Ensure SOC stays within battery limits
+                    predicted_soc[point_index] = np.clip(
+                        predicted_soc[point_index],
+                        _battery.min_soc,
+                        _battery.max_soc
+                    ) * 100
+
+            # Only add final point if it's the last iteration
+            if i == len(prices) - 1:
+                final_soc = np.clip(
+                    predicted_soc[min(len(predicted_soc) - 1, (i + 1) * points_per_hour - 1)],
+                    _battery.min_soc,
+                    _battery.max_soc
+                )
+                timestamps.append(prices.index[-1])
+                soc_values.append(final_soc * 100)  # Convert to percentage
         
         fig.add_trace(go.Scatter(
             x=timestamps,
