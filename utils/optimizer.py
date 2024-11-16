@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.price_data import get_price_forecast_confidence
 import streamlit as st
 
@@ -71,8 +71,6 @@ def optimize_schedule(_prices, _battery):
     schedule = np.zeros(periods)
     predicted_soc = np.zeros(periods * 4)  # Removed the +1 to fix alignment
     consumption_stats = analyze_consumption_patterns(_battery, _prices.index)
-    now = datetime.now()
-    current_hour = now.replace(minute=0, second=0, microsecond=0).hour
 
     # Calculate effective prices with reduced confidence weighting impact
     effective_prices = pd.Series([
@@ -99,8 +97,8 @@ def optimize_schedule(_prices, _battery):
     for i in range(periods):
         current_datetime = _prices.index[i]
         current_date = current_datetime.date()
+        current_hour = current_datetime.hour
         current_price = effective_prices.iloc[i]
-        hour = current_hour + i
 
         # Initialize daily tracking if needed
         if current_date not in daily_events:
@@ -121,7 +119,7 @@ def optimize_schedule(_prices, _battery):
         schedule[i] = 0
 
         # Look ahead for better prices with extended window
-        look_ahead_window = min(36, periods - i - 1)  # Increased from 24 to 36
+        look_ahead_window = min(36, periods - i - 1)
         look_ahead_end = min(i + look_ahead_window, periods)
         future_prices = effective_prices.iloc[i + 1:look_ahead_end]
         future_max_price = future_prices.max() if len(future_prices) > 0 else 0
@@ -176,7 +174,7 @@ def optimize_schedule(_prices, _battery):
 
             # Calculate home consumption for this hour
             current_hour_consumption = _battery.get_hourly_consumption(
-                hour, current_datetime)
+                current_hour, current_datetime)
 
             # Calculate SOC impacts for this hour
             consumption_soc_impact = current_hour_consumption / _battery.capacity  # Hourly consumption impact
@@ -214,5 +212,7 @@ def optimize_schedule(_prices, _battery):
 
         # Ensure SOC stays within limits
         current_soc = np.clip(current_soc, _battery.min_soc, _battery.max_soc)
+    #print("Consumption for {} {} {}".format(schedule,predicted_soc,
+    #                                        consumption_stats))
 
     return schedule, predicted_soc, consumption_stats

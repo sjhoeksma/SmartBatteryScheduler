@@ -62,3 +62,9 @@ streamlit run main.py
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+
+# TODO
+
+* Fix issue in battery.py that it used the day "use patern" predicted or base on model. Now its hard coded
+* Consumptions stats in optimizer.py are strange at 0.15
