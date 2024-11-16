@@ -1,9 +1,106 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from datetime import datetime, timedelta, timezone
 from utils.translations import get_text
 from components.price_chart import render_price_chart
 from utils.object_store import ObjectStore
+
+def render_schedule_timeline(schedule_df):
+    """Render a visual timeline of scheduled operations"""
+    if schedule_df.empty:
+        return None
+        
+    fig = go.Figure()
+    
+    # Define colors for different operations and status
+    colors = {
+        'charge': {
+            'scheduled': 'rgb(52, 152, 219)',
+            'in_progress': 'rgb(41, 128, 185)',
+            'completed': 'rgb(33, 97, 140)',
+            'optimized': 'rgb(52, 152, 219)'  # Added optimized status
+        },
+        'discharge': {
+            'scheduled': 'rgb(231, 76, 60)',
+            'in_progress': 'rgb(192, 57, 43)',
+            'completed': 'rgb(146, 43, 33)',
+            'optimized': 'rgb(231, 76, 60)'  # Added optimized status
+        }
+    }
+    
+    # Convert operation names to standardized format
+    operation_map = {
+        get_text('operation_charge'): 'charge',
+        get_text('operation_discharge'): 'discharge'
+    }
+    
+    for idx, row in schedule_df.iterrows():
+        operation = operation_map.get(row[get_text('operation')], 'charge')
+        start_time = pd.to_datetime(row[get_text('start_time')])
+        duration = row[get_text('duration_hours')]
+        end_time = start_time + pd.Timedelta(hours=duration)
+        status = row['Status'].lower()
+        power = row[get_text('power_kw')]
+        
+        color = colors[operation][status]
+        
+        # Create hover text
+        hover_text = (
+            f"Operation: {row[get_text('operation')]}<br>"
+            f"Power: {power:.1f} kW<br>"
+            f"Start: {start_time.strftime('%Y-%m-%d %H:%M')}<br>"
+            f"Duration: {duration}h<br>"
+            f"Status: {row['Status']}<br>"
+            f"Type: {row['Type']}"
+        )
+        
+        fig.add_trace(go.Bar(
+            name=row[get_text('operation')],
+            x=[start_time],
+            y=[power],
+            width=duration * 3600000,  # Convert hours to milliseconds
+            marker_color=color,
+            text=f"{power:.1f}kW",
+            textposition='auto',
+            hovertext=hover_text,
+            hoverinfo='text',
+            showlegend=False
+        ))
+    
+    # Update layout
+    fig.update_layout(
+        title=get_text("scheduled_operations"),
+        xaxis=dict(
+            title="Time",
+            type='date',
+            tickformat="%Y-%m-%d %H:%M",
+            tickangle=-45
+        ),
+        yaxis=dict(
+            title="Power (kW)",
+            range=[
+                -max(abs(schedule_df[get_text('power_kw')])) * 1.1,
+                max(abs(schedule_df[get_text('power_kw')])) * 1.1
+            ]
+        ),
+        barmode='overlay',
+        height=400,
+        margin=dict(l=50, r=50, t=50, b=50)
+    )
+    
+    # Add legend for status colors
+    for operation in ['charge', 'discharge']:
+        for status in ['scheduled', 'in_progress', 'completed', 'optimized']:
+            fig.add_trace(go.Bar(
+                x=[None],
+                y=[None],
+                name=f"{operation.title()} - {status.title()}",
+                marker_color=colors[operation][status],
+                showlegend=True
+            ))
+    
+    return fig
 
 def render_manual_battery_control(battery, prices=None, schedule=None, predicted_soc=None, consumption_stats=None):
     """Render manual battery control interface with scheduling"""
@@ -128,9 +225,6 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
             st.session_state.battery_schedules = st.session_state.store.load_schedules()
             st.success("Schedule added successfully!")
     
-    # Display schedules
-    st.markdown("### " + get_text("scheduled_operations"))
-    
     # Process all schedules (manual and optimized)
     schedule_data = []
     current_time = datetime.now(timezone.utc)
@@ -199,6 +293,11 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         schedule_df = pd.DataFrame(schedule_data)
         schedule_df['start_time_dt'] = pd.to_datetime(schedule_df[get_text('start_time')])
         schedule_df = schedule_df.sort_values('start_time_dt')
+        
+        # Render timeline visualization
+        timeline_fig = render_schedule_timeline(schedule_df)
+        if timeline_fig:
+            st.plotly_chart(timeline_fig, use_container_width=True)
         
         # Display schedules in a table
         display_df = schedule_df[[
