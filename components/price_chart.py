@@ -158,23 +158,25 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
         
         # Add charging/discharging visualization with increased opacity
         if schedule is not None and isinstance(schedule, (list, np.ndarray)) and len(schedule) > 0:
-            charge_mask = schedule > 0
-            discharge_mask = schedule < 0
+            # Convert schedule to numpy array if it's a list
+            schedule_array = np.array(schedule) if isinstance(schedule, list) else schedule
+            charge_mask = np.greater(schedule_array, 0)
+            discharge_mask = np.less(schedule_array, 0)
             
-            if any(charge_mask):
+            if np.any(charge_mask):
                 fig.add_trace(go.Bar(
                     x=prices.index[charge_mask],
-                    y=schedule[charge_mask],
+                    y=schedule_array[charge_mask],
                     name="Charging",
                     marker_color="rgba(52, 152, 219, 0.98)",
                     width=3600000,
                     hovertemplate="Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"
                 ))
             
-            if any(discharge_mask):
+            if np.any(discharge_mask):
                 fig.add_trace(go.Bar(
                     x=prices.index[discharge_mask],
-                    y=schedule[discharge_mask],
+                    y=schedule_array[discharge_mask],
                     name="Discharging",
                     marker_color="rgba(41, 128, 185, 0.98)",
                     width=3600000,
@@ -182,22 +184,25 @@ def render_price_chart(prices, schedule=None, predicted_soc=None, consumption_st
                 ))
         
         # Add SOC prediction with proper point visualization
-        if (predicted_soc is not None and isinstance(predicted_soc, (list, np.ndarray)) and 
-            len(predicted_soc) > 0 and 'battery' in st.session_state):
+        if predicted_soc is not None and isinstance(predicted_soc, (list, np.ndarray)) and len(predicted_soc) > 0 and 'battery' in st.session_state:
             # Create full timeline of points
             timestamps = []
             soc_values = []
             points_per_hour = 4 if len(prices) <= 24 else 2
             
+            # Convert predicted_soc to numpy array if it's a list
+            soc_array = np.array(predicted_soc) if isinstance(predicted_soc, list) else predicted_soc
+            
             for i in range(len(prices)):
                 # Add points for each interval within the hour
                 for j in range(points_per_hour):
                     point_index = i * points_per_hour + j
-                    if point_index < len(predicted_soc):
+                    if point_index < len(soc_array):
                         timestamps.append(prices.index[i] + timedelta(minutes=15*j))
-                        soc_values.append(predicted_soc[point_index])
-            
-            # Only add SOC prediction trace if we have valid points
+                        # Convert SOC from decimal to percentage (0-100 range)
+                        soc_values.append(float(soc_array[point_index] * 100))
+    
+            # Add SOC prediction trace if we have valid points
             if timestamps and soc_values:
                 fig.add_trace(go.Scatter(
                     x=timestamps,
