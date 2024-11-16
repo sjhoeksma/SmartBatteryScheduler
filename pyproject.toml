@@ -14,5 +14,6 @@ dependencies = [
     "pytz>=2023.3",
     "requests<=2.32.3",
     "scipy",
+    "streamlit-echarts>=0.4.0",
     "streamlit>=1.24.0",
 ]

@@ -140,8 +140,8 @@ def optimize_schedule(_prices, _battery):
                 daily_events[current_date]['charge_events'] < _battery.max_charge_events and
                 available_capacity > 0):
                 max_allowed_charge = min(
-                    _battery.charge_rate,
-                    available_capacity,
+                    available_capacity,  # Remove hardcoded value
+                    _battery.charge_rate,  # Use battery's actual charge rate
                     remaining_cycles * _battery.capacity
                 )
                 if max_allowed_charge > 0:
