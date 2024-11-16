@@ -260,6 +260,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         start_idx = 0
         power_threshold = 0.1  # Minimum power threshold (kW)
         
+        # Update the optimized schedule processing
         for i, power in enumerate(schedule):
             if abs(power) > power_threshold:
                 if current_operation is None or (power > 0) != (current_operation['power'] > 0):
@@ -273,6 +274,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                             if end_time.tzinfo is None:
                                 end_time = end_time.replace(tzinfo=timezone.utc)
                             
+                            # Update the status to 'Optimized'
                             schedule_data.append({
                                 'idx': None,  # No index for optimized schedules
                                 get_text('operation'): get_text('operation_charge') if current_operation['power'] > 0 
@@ -281,7 +283,7 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                                 get_text('start_time'): start_time.strftime('%Y-%m-%d %H:%M'),
                                 get_text('duration_hours'): duration,
                                 'End Time': end_time.strftime('%Y-%m-%d %H:%M'),
-                                'Status': 'Optimized',
+                                'Status': 'Optimized', # Update the status here
                                 'Type': 'Optimized'
                             })
                     
