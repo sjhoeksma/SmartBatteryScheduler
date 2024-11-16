@@ -167,28 +167,36 @@ def optimize_schedule(_prices, _battery):
                     daily_events[current_date]['discharge_events'] += 1
                     daily_events[current_date]['cycles'] += max_allowed_discharge / _battery.capacity
         
-        # Calculate SOC change immediately when charging/discharging occurs
-        strategic_change = schedule[i] / _battery.capacity
-        total_change = strategic_change - consumption_impact
+        # Calculate SOC change with proper consumption impact scaling
+        if schedule[i] != 0:
+            # When charging/discharging, apply power change immediately
+            strategic_change = schedule[i] / _battery.capacity
+            consumption_impact = home_consumption / (_battery.capacity * 24)  # Scale to hourly impact
+            total_change = strategic_change - consumption_impact
+        else:
+            # When idle, only apply consumption impact
+            strategic_change = 0
+            consumption_impact = home_consumption / (_battery.capacity * 24)  # Scale to hourly impact
+            total_change = -consumption_impact
 
-        # Update intermediate points for the current hour
+        # Update intermediate points for the current hour with proper scaling
         for j in range(4):
             point_index = i * 4 + j
-            if schedule[i] != 0:
-                # For charging/discharging, apply full change immediately
-                predicted_soc[point_index] = current_soc + total_change
-            else:
-                # For consumption-only periods, keep gradual change
-                alpha = (j + 1) / 4
-                predicted_soc[point_index] = current_soc + (total_change * alpha)
-            
-            # Ensure SOC stays within battery limits
-            predicted_soc[point_index] = np.clip(
-                predicted_soc[point_index],
-                _battery.min_soc,
-                _battery.max_soc
-            )
-        
+            if point_index < len(predicted_soc):
+                if schedule[i] != 0:
+                    # For charging/discharging, apply strategic change immediately
+                    predicted_soc[point_index] = current_soc + strategic_change - (consumption_impact * (j + 1) / 4)
+                else:
+                    # For consumption-only periods, apply gradual change
+                    predicted_soc[point_index] = current_soc - (consumption_impact * (j + 1) / 4)
+                
+                # Ensure SOC stays within battery limits
+                predicted_soc[point_index] = np.clip(
+                    predicted_soc[point_index],
+                    _battery.min_soc,
+                    _battery.max_soc
+                )
+
         # Update current SOC for next hour
         current_soc += total_change
         
