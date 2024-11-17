@@ -130,6 +130,16 @@ def render_battery_config():
                                 max_value=1.0,
                                 value=float(profile.max_soc))
 
+            # Add PV configuration
+            max_watt_peak = st.number_input(
+                "PV Installation Size (Wp)",
+                min_value=0.0,
+                max_value=20000.0,
+                value=float(profile.max_watt_peak),
+                step=100.0,
+                help="Maximum power output of your PV installation in Watt peak"
+            )
+
         with col2:
             surcharge_rate = st.number_input(
                 "Surcharge Rate (€/kWh)",
@@ -197,7 +207,7 @@ def render_battery_config():
                         use_container_width=True)
 
         if st.form_submit_button("Update Configuration"):
-            # Create updated profile
+            # Create updated profile with max_watt_peak
             updated_profile = BatteryProfile(
                 name=current_profile,
                 capacity=capacity,
@@ -212,7 +222,8 @@ def render_battery_config():
                 surcharge_rate=round(surcharge_rate, 3),
                 max_daily_cycles=max_daily_cycles,
                 max_charge_events=max_charge_events,
-                max_discharge_events=max_discharge_events)
+                max_discharge_events=max_discharge_events,
+                max_watt_peak=max_watt_peak)
 
             # Save updated profile and update battery instance
             st.session_state.store.save_profile(updated_profile)
@@ -232,7 +243,8 @@ def render_battery_config():
                 surcharge_rate=round(surcharge_rate, 3),
                 max_daily_cycles=max_daily_cycles,
                 max_charge_events=max_charge_events,
-                max_discharge_events=max_discharge_events)
+                max_discharge_events=max_discharge_events,
+                max_watt_peak=max_watt_peak)
 
             # Clear optimization cache to force schedule recalculation
             st.cache_data.clear()
@@ -260,7 +272,8 @@ def render_battery_config():
                     surcharge_rate=round(surcharge_rate, 3),
                     max_daily_cycles=max_daily_cycles,
                     max_charge_events=max_charge_events,
-                    max_discharge_events=max_discharge_events)
+                    max_discharge_events=max_discharge_events,
+                    max_watt_peak=max_watt_peak)
                 st.session_state.store.save_profile(new_profile)
 
                 # Update battery instance with new profile
@@ -278,7 +291,8 @@ def render_battery_config():
                     surcharge_rate=round(surcharge_rate, 3),
                     max_daily_cycles=max_daily_cycles,
                     max_charge_events=max_charge_events,
-                    max_discharge_events=max_discharge_events)
+                    max_discharge_events=max_discharge_events,
+                    max_watt_peak=max_watt_peak)
 
                 # Clear optimization cache to force schedule recalculation
                 st.cache_data.clear()
