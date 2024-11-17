@@ -123,6 +123,7 @@ def optimize_schedule(_prices, _battery):
         look_ahead_end = min(i + look_ahead_window, periods)
         future_prices = effective_prices.iloc[i + 1:look_ahead_end]
         future_max_price = future_prices.max() if len(future_prices) > 0 else 0
+        future_min_price = future_prices.min() if len(future_prices) > 0 else future_max_price
 
         # Add strict peak detection with higher threshold
         is_peak = current_price >= future_prices.quantile(0.95) if len(
@@ -143,14 +144,17 @@ def optimize_schedule(_prices, _battery):
 
         if remaining_cycles > 0:
             # Charging decision with relative threshold
-           # relative_charge_threshold = thresholds['rolling_mean'] * 0.98
-            if (is_valley #and current_price <= relative_charge_threshold
+            relative_charge_threshold = thresholds['rolling_mean'] * 0.98
+            if (is_valley and current_price <= relative_charge_threshold 
+                    and future_min_price!=future_max_price
                     and daily_events[current_date]['charge_events']
                     < _battery.max_charge_events and available_capacity > 0):
                 max_allowed_charge = min(
                     available_capacity,  # Remove hardcoded value
                     _battery.charge_rate,  # Use battery's actual charge rate
                     remaining_cycles * _battery.capacity)
+                
+                # If we cannot load the full charge any more look if there is a better option within the same
                 if max_allowed_charge > 0:
                     schedule[i] = max_allowed_charge
                     daily_events[current_date]['charge_events'] += 1

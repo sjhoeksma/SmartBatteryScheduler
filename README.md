@@ -69,3 +69,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 * Fix issue in battery.py that it used the day "use patern" predicted or base on model. Now its hard coded
 * Consumptions stats in optimizer.py are strange at 0.15
 * Add support for Car loading algorithm
+* We should look more a head for the second charge of discharge point, border should be 24 hours not date
+* Sometimes no discharge is added
+* Add PV to the calculation
+* Combine number of charge discharge in to only the number of fully cycles
+* 

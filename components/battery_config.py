@@ -85,7 +85,7 @@ def render_battery_config():
                                            st.session_state.current_profile))
         st.session_state.current_profile = current_profile
     with col2:
-        if st.button("⟳ Reload", key="reload"):
+        if st.button("🔄 Reload", key="reload"):
             st.cache_data.clear()
             st.rerun()
 
