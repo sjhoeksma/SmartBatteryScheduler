@@ -14,23 +14,32 @@ def render_schedule_timeline(schedules):
     # Create figure with enhanced layout
     fig = go.Figure()
 
-    # Sort schedules by start time
+    # Sort schedules by start time and ensure all schedules are included
     schedules = sorted(schedules, key=lambda x: x['start_time'])
-
+    
     # Add bars for each schedule with enhanced styling
     for schedule in schedules:
+        # Convert start_time to datetime if it isn't already
+        if isinstance(schedule['start_time'], str):
+            schedule['start_time'] = datetime.fromisoformat(schedule['start_time'].replace('Z', '+00:00'))
+        
         start_time = schedule['start_time']
         end_time = start_time + timedelta(hours=schedule['duration'])
         operation = schedule['operation']
         power = schedule['power']
         status = schedule.get('status', 'scheduled')
-
+        schedule_type = schedule.get('type', 'manual')  # Default to manual type
+        
+        # Skip invalid schedules
+        if not all(key in schedule for key in ['start_time', 'duration', 'power', 'operation']):
+            continue
+            
         # Enhanced color scheme with status indication
         if operation == 'charge':
             base_color = 'rgb(52, 152, 219)'  # Blue
         else:
             base_color = 'rgb(231, 76, 60)'  # Red
-
+            
         # Status-based opacity and pattern
         opacity = 1.0 if status == 'scheduled' else 0.7 if status == 'in_progress' else 0.4
         pattern = '' if status == 'scheduled' else '/' if status == 'in_progress' else 'x'
@@ -40,7 +49,7 @@ def render_schedule_timeline(schedules):
             x=[start_time],
             y=[abs(power)],
             width=[schedule['duration'] * 3600000],  # Convert hours to milliseconds
-            name=f"{operation.title()} ({status})",
+            name=f"{operation.title()} ({schedule_type.title()})",
             marker=dict(
                 color=f'rgba{tuple(list(eval(base_color[3:]))+ [opacity])}',
                 pattern_shape=pattern
@@ -52,6 +61,7 @@ def render_schedule_timeline(schedules):
                 f"Duration: {schedule['duration']} hours<br>" +
                 f"End: {end_time}<br>" +
                 f"Status: {status.title()}<br>" +
+                f"Type: {schedule_type.title()}<br>" +
                 "<extra></extra>"
             )
         ))
@@ -179,13 +189,14 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                 if start_datetime < now:
                     start_datetime += timedelta(days=1)
                 
-                # Create schedule
+                # Create schedule with proper type
                 schedule_entry = {
                     'operation': operation,
                     'power': power if operation == 'charge' else -power,
                     'start_time': start_datetime.replace(tzinfo=pytz.UTC),
                     'duration': duration,
-                    'status': 'scheduled'
+                    'status': 'scheduled',
+                    'type': 'manual'  # Explicitly set type
                 }
                 
                 try:
