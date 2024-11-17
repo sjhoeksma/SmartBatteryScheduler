@@ -198,6 +198,35 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
         st.subheader(get_text("scheduled_operations"))
         schedules = store.load_schedules()
         
+        # Add real-time operation if exists
+        current_power = battery.get_current_power()
+        if abs(current_power) > 0.1:
+            current_time = datetime.now(pytz.UTC)
+            realtime_schedule = {
+                'operation': 'charge' if current_power > 0 else 'discharge',
+                'power': abs(current_power),
+                'start_time': current_time,
+                'duration': 1,  # 1 hour for real-time operations
+                'status': 'in_progress',
+                'type': 'realtime'
+            }
+            schedules.insert(0, realtime_schedule)  # Add at the beginning
+        
+        # Add remove button for each schedule
+        if schedules:
+            st.markdown("### Current Operations")
+            for idx, schedule in enumerate(schedules):
+                if schedule.get('type') != 'realtime':  # Only show remove button for manual schedules
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.write(f"{schedule['operation'].title()}: {abs(schedule['power'])}kW at {schedule['start_time'].strftime('%H:%M')} for {schedule['duration']}h")
+                    with col2:
+                        st.write(f"Status: {schedule['status']}")
+                    with col3:
+                        if st.button("🗑️", key=f"remove_{idx}"):
+                            store.remove_schedule(idx)
+                            st.rerun()
+        
         # Render timeline visualization
         render_schedule_timeline(schedules)
         

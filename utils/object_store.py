@@ -244,9 +244,25 @@ class ObjectStore:
 
     def remove_schedule(self, index: int) -> None:
         """Remove a schedule by index"""
-        if 0 <= index < len(st.session_state.persist_schedules):
-            st.session_state.persist_schedules.pop(index)
-            self._save_schedules()
+        try:
+            if 'persist_schedules' not in st.session_state:
+                st.session_state.persist_schedules = self._load_schedules()
+            
+            # Validate index is within bounds
+            if 0 <= index < len(st.session_state.persist_schedules):
+                # Remove the schedule
+                removed_schedule = st.session_state.persist_schedules.pop(index)
+                print(f"Removed schedule: {removed_schedule}")
+                
+                # Save updated schedules
+                self._save_schedules()
+                return True
+            else:
+                print(f"Invalid schedule index: {index}")
+                return False
+        except Exception as e:
+            print(f"Error removing schedule: {str(e)}")
+            return False
 
     def load_schedules(self) -> List[Dict[str, Any]]:
         """Load and return active schedules"""
