@@ -7,18 +7,17 @@ from utils.translations import get_text
 from utils.object_store import ObjectStore
 
 def render_schedule_timeline(schedules):
-    """Render a visual timeline of scheduled operations"""
     if not schedules:
         st.info("No scheduled operations")
         return
 
-    # Create figure
+    # Create figure with enhanced layout
     fig = go.Figure()
 
     # Sort schedules by start time
     schedules = sorted(schedules, key=lambda x: x['start_time'])
 
-    # Add bars for each schedule
+    # Add bars for each schedule with enhanced styling
     for schedule in schedules:
         start_time = schedule['start_time']
         end_time = start_time + timedelta(hours=schedule['duration'])
@@ -26,49 +25,64 @@ def render_schedule_timeline(schedules):
         power = schedule['power']
         status = schedule.get('status', 'scheduled')
 
-        # Set color and opacity based on operation type and status
+        # Enhanced color scheme with status indication
         if operation == 'charge':
-            color = 'rgba(52, 152, 219, {})'  # Blue
+            base_color = 'rgb(52, 152, 219)'  # Blue
         else:
-            color = 'rgba(231, 76, 60, {})'  # Red
+            base_color = 'rgb(231, 76, 60)'  # Red
 
-        # Set opacity based on status
-        if status == 'completed':
-            opacity = 0.4
-        elif status == 'in_progress':
-            opacity = 0.7
-        else:  # scheduled
-            opacity = 1.0
+        # Status-based opacity and pattern
+        opacity = 1.0 if status == 'scheduled' else 0.7 if status == 'in_progress' else 0.4
+        pattern = '' if status == 'scheduled' else '/' if status == 'in_progress' else 'x'
 
-        # Add bar
+        # Add bar with enhanced hover information
         fig.add_trace(go.Bar(
             x=[start_time],
             y=[abs(power)],
             width=[schedule['duration'] * 3600000],  # Convert hours to milliseconds
             name=f"{operation.title()} ({status})",
-            marker_color=color.format(opacity),
+            marker=dict(
+                color=f'rgba{tuple(list(eval(base_color[3:]))+ [opacity])}',
+                pattern_shape=pattern
+            ),
             hovertemplate=(
-                f"Operation: {operation.title()}<br>"
-                f"Power: {abs(power):.1f} kW<br>"
-                f"Start: %{x}<br>"
-                f"Duration: {schedule['duration']} hours<br>"
-                f"Status: {status.title()}"
+                "<b>%{fullData.name}</b><br>" +
+                "Power: %{y:.1f} kW<br>" +
+                "Start: %{x}<br>" +
+                f"Duration: {schedule['duration']} hours<br>" +
+                f"End: {end_time}<br>" +
+                f"Status: {status.title()}<br>" +
+                "<extra></extra>"
             )
         ))
 
-    # Update layout
+    # Enhanced layout
     fig.update_layout(
-        title="Scheduled Operations Timeline",
-        xaxis_title="Time",
-        yaxis_title="Power (kW)",
+        title=dict(
+            text="Scheduled Operations Timeline",
+            x=0.5,
+            xanchor='center'
+        ),
+        xaxis=dict(
+            title="Time",
+            type='date',
+            tickformat='%H:%M\n%Y-%m-%d',
+            tickangle=-45,
+            gridcolor='rgba(128,128,128,0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title="Power (kW)",
+            gridcolor='rgba(128,128,128,0.2)',
+            showgrid=True
+        ),
         barmode='overlay',
         showlegend=True,
         height=400,
-        xaxis=dict(
-            type='date',
-            tickformat='%H:%M\n%Y-%m-%d',
-            tickangle=-45
-        )
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        hoverlabel=dict(bgcolor='white'),
+        hovermode='closest'
     )
 
     st.plotly_chart(fig, use_container_width=True)
