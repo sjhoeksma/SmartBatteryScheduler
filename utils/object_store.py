@@ -185,7 +185,8 @@ class ObjectStore:
                     'surcharge_rate': profile.surcharge_rate,
                     'max_daily_cycles': profile.max_daily_cycles,
                     'max_charge_events': profile.max_charge_events,
-                    'max_discharge_events': profile.max_discharge_events
+                    'max_discharge_events': profile.max_discharge_events,
+                    'max_watt_peak': profile.max_watt_peak
                 }
 
             os.makedirs(os.path.dirname(self.profile_file), exist_ok=True)
