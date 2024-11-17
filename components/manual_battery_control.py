@@ -14,59 +14,59 @@ def render_schedule_timeline(schedules):
     # Create figure with enhanced layout
     fig = go.Figure()
 
-    # Sort schedules by start time and ensure all schedules are included
-    schedules = sorted(schedules, key=lambda x: x['start_time'])
-    
-    # Add bars for each schedule with enhanced styling
+    # Sort schedules by start time
+    schedules = sorted(
+        [s for s in schedules if isinstance(s, dict) and all(k in s for k in ['start_time', 'power', 'duration', 'operation'])],
+        key=lambda x: x['start_time']
+    )
+
+    # Process each schedule and add to visualization
     for schedule in schedules:
-        # Convert start_time to datetime if it isn't already
-        if isinstance(schedule['start_time'], str):
-            schedule['start_time'] = datetime.fromisoformat(schedule['start_time'].replace('Z', '+00:00'))
-        
-        start_time = schedule['start_time']
-        end_time = start_time + timedelta(hours=schedule['duration'])
-        operation = schedule['operation']
-        power = schedule['power']
-        status = schedule.get('status', 'scheduled')
-        schedule_type = schedule.get('type', 'manual')  # Default to manual type
-        
-        # Skip invalid schedules
-        if not all(key in schedule for key in ['start_time', 'duration', 'power', 'operation']):
+        try:
+            # Ensure start_time is datetime
+            if isinstance(schedule['start_time'], str):
+                schedule['start_time'] = datetime.fromisoformat(schedule['start_time'].replace('Z', '+00:00'))
+            
+            start_time = schedule['start_time']
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=pytz.UTC)
+            
+            end_time = start_time + timedelta(hours=schedule['duration'])
+            operation = schedule['operation']
+            power = abs(schedule['power'])  # Ensure positive power value for display
+            status = schedule.get('status', 'scheduled')
+            schedule_type = schedule.get('type', 'manual')
+
+            # Color scheme based on operation and status
+            base_color = 'rgb(52, 152, 219)' if operation == 'charge' else 'rgb(231, 76, 60)'
+            opacity = 1.0 if status == 'scheduled' else 0.7 if status == 'in_progress' else 0.4
+            pattern = '' if status == 'scheduled' else '/' if status == 'in_progress' else 'x'
+
+            # Add bar with enhanced hover information
+            fig.add_trace(go.Bar(
+                x=[start_time],
+                y=[power],
+                width=[schedule['duration'] * 3600000],  # Convert hours to milliseconds
+                name=f"{operation.title()} ({schedule_type.title()})",
+                marker=dict(
+                    color=f'rgba{tuple(list(eval(base_color[3:]))+ [opacity])}',
+                    pattern_shape=pattern
+                ),
+                hovertemplate=(
+                    f"<b>{operation.title()} ({schedule_type.title()})</b><br>" +
+                    f"Power: {power:.1f} kW<br>" +
+                    f"Start: {start_time.strftime('%Y-%m-%d %H:%M')}<br>" +
+                    f"Duration: {schedule['duration']} hours<br>" +
+                    f"End: {end_time.strftime('%Y-%m-%d %H:%M')}<br>" +
+                    f"Status: {status.title()}<br>" +
+                    "<extra></extra>"
+                )
+            ))
+        except Exception as e:
+            print(f"Error processing schedule: {str(e)}")
             continue
-            
-        # Enhanced color scheme with status indication
-        if operation == 'charge':
-            base_color = 'rgb(52, 152, 219)'  # Blue
-        else:
-            base_color = 'rgb(231, 76, 60)'  # Red
-            
-        # Status-based opacity and pattern
-        opacity = 1.0 if status == 'scheduled' else 0.7 if status == 'in_progress' else 0.4
-        pattern = '' if status == 'scheduled' else '/' if status == 'in_progress' else 'x'
 
-        # Add bar with enhanced hover information
-        fig.add_trace(go.Bar(
-            x=[start_time],
-            y=[abs(power)],
-            width=[schedule['duration'] * 3600000],  # Convert hours to milliseconds
-            name=f"{operation.title()} ({schedule_type.title()})",
-            marker=dict(
-                color=f'rgba{tuple(list(eval(base_color[3:]))+ [opacity])}',
-                pattern_shape=pattern
-            ),
-            hovertemplate=(
-                "<b>%{fullData.name}</b><br>" +
-                "Power: %{y:.1f} kW<br>" +
-                "Start: %{x}<br>" +
-                f"Duration: {schedule['duration']} hours<br>" +
-                f"End: {end_time}<br>" +
-                f"Status: {status.title()}<br>" +
-                f"Type: {schedule_type.title()}<br>" +
-                "<extra></extra>"
-            )
-        ))
-
-    # Enhanced layout
+    # Update layout with enhanced settings
     fig.update_layout(
         title=dict(
             text="Scheduled Operations Timeline",
@@ -79,7 +79,9 @@ def render_schedule_timeline(schedules):
             tickformat='%H:%M\n%Y-%m-%d',
             tickangle=-45,
             gridcolor='rgba(128,128,128,0.2)',
-            showgrid=True
+            showgrid=True,
+            range=[min(s['start_time'] for s in schedules),
+                   max(s['start_time'] + timedelta(hours=s['duration']) for s in schedules)]
         ),
         yaxis=dict(
             title="Power (kW)",
