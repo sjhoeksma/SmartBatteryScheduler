@@ -15,6 +15,7 @@ from utils.optimizer import optimize_schedule
 from utils.battery import Battery
 from utils.translations import get_text, add_language_selector
 from utils.object_store import ObjectStore
+from utils.weather_service import WeatherService
 
 st.set_page_config(page_title="Energy Management Dashboard",
                   page_icon="⚡",
@@ -30,7 +31,7 @@ def get_max_forecast_hours():
         # After 13:00 CET, we have tomorrow's prices
         return 36  # Changed from 48 to 36 hours
     else:
-        # Before 13:00 CET, calculate remaining hours plus next day
+        # Before 13:00 CET, calculate remaining hours
         remaining_hours = 24 - now.hour
         return remaining_hours  # Only return remaining hours of current day
 
@@ -49,9 +50,12 @@ def main():
     st.title(get_text("app_title"))
 
     # Initialize session state
-
     if 'store' not in st.session_state:
         st.session_state.store = ObjectStore()
+
+    # Initialize WeatherService
+    if 'weather_service' not in st.session_state:
+        st.session_state.weather_service = WeatherService()
 
     if 'battery' not in st.session_state:
         default_profile = st.session_state.store.get_profile("Home Battery")
