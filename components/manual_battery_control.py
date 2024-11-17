@@ -7,6 +7,7 @@ from utils.translations import get_text
 from utils.object_store import ObjectStore
 
 def render_schedule_timeline(schedules):
+    """Render timeline visualization of scheduled operations"""
     if not schedules:
         st.info("No scheduled operations")
         return
@@ -237,8 +238,10 @@ def render_manual_battery_control(battery, prices=None, schedule=None, predicted
                         st.write(f"Status: {schedule['status']}")
                     with col3:
                         if st.button("🗑️", key=f"remove_{idx}"):
-                            store.remove_schedule(idx)
-                            st.rerun()
+                            if store.remove_schedule(idx):
+                                st.rerun()
+                            else:
+                                st.error("Failed to remove schedule")
         
         # Render timeline visualization
         render_schedule_timeline(schedules)

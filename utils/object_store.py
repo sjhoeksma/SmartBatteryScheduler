@@ -109,7 +109,7 @@ class ObjectStore:
                 return []
         return []
 
-    def _save_schedules(self) -> None:
+    def _save_schedules(self) -> bool:
         """Save schedules to file with proper timezone handling"""
         try:
             schedules = st.session_state.persist_schedules
@@ -126,10 +126,13 @@ class ObjectStore:
                         s_copy['start_time'] = s_copy['start_time'].isoformat()
                     serializable_schedules.append(s_copy)
 
+            os.makedirs(os.path.dirname(self.schedule_file), exist_ok=True)
             with open(self.schedule_file, 'w') as f:
                 json.dump(serializable_schedules, f, indent=2)
+            return True
         except Exception as e:
             print(f"Error saving schedules: {str(e)}")
+            return False
 
     def _load_profiles(self) -> Dict[str, Any]:
         if os.path.exists(self.profile_file):
@@ -185,6 +188,7 @@ class ObjectStore:
                     'max_discharge_events': profile.max_discharge_events
                 }
 
+            os.makedirs(os.path.dirname(self.profile_file), exist_ok=True)
             with open(self.profile_file, 'w') as f:
                 json.dump(profiles_data, f, indent=2)
         except Exception as e:
@@ -236,30 +240,43 @@ class ObjectStore:
 
             # Add schedule and save
             st.session_state.persist_schedules.append(schedule)
-            self._save_schedules()
+            if not self._save_schedules():
+                raise ValueError("Failed to save schedule to file")
 
         except Exception as e:
             print(f"Error saving schedule: {str(e)}")
             raise
 
-    def remove_schedule(self, index: int) -> None:
-        """Remove a schedule by index"""
+    def remove_schedule(self, index: int) -> bool:
+        """Remove a schedule by index with enhanced error handling and validation"""
         try:
+            # Ensure schedules are loaded
             if 'persist_schedules' not in st.session_state:
                 st.session_state.persist_schedules = self._load_schedules()
             
-            # Validate index is within bounds
-            if 0 <= index < len(st.session_state.persist_schedules):
-                # Remove the schedule
-                removed_schedule = st.session_state.persist_schedules.pop(index)
-                print(f"Removed schedule: {removed_schedule}")
-                
-                # Save updated schedules
-                self._save_schedules()
-                return True
-            else:
-                print(f"Invalid schedule index: {index}")
+            # Validate index
+            if not isinstance(index, int):
+                print(f"Invalid index type: {type(index)}")
                 return False
+                
+            # Check if index is within bounds
+            if index < 0 or index >= len(st.session_state.persist_schedules):
+                print(f"Index out of range: {index}")
+                return False
+                
+            # Remove the schedule
+            removed_schedule = st.session_state.persist_schedules.pop(index)
+            print(f"Removed schedule: {removed_schedule}")
+            
+            # Save updated schedules
+            if not self._save_schedules():
+                print("Failed to save schedules after removal")
+                # Revert the removal if save fails
+                st.session_state.persist_schedules.insert(index, removed_schedule)
+                return False
+                
+            return True
+            
         except Exception as e:
             print(f"Error removing schedule: {str(e)}")
             return False
