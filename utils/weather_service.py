@@ -7,7 +7,11 @@ from typing import Dict, Optional, Tuple
 import pvlib
 from pvlib.location import Location
 import pytz
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class WeatherService:
     def __init__(self):
@@ -32,6 +36,7 @@ class WeatherService:
             self._location_cache = (float(data['latitude']), float(data['longitude']))
             return self._location_cache
         except Exception as e:
+            logger.warning(f"Failed to get location from IP: {str(e)}")
             # Default to Amsterdam coordinates if location detection fails
             default_location = (52.3676, 4.9041)
             self._location_cache = default_location
@@ -68,6 +73,7 @@ class WeatherService:
             
             return data
         except Exception as e:
+            logger.error(f"Error fetching weather data: {str(e)}")
             raise Exception(f"Error fetching weather data: {str(e)}")
 
     def calculate_solar_production(self, 
@@ -87,45 +93,88 @@ class WeatherService:
             timezone = pytz.timezone(self._get_timezone(lat, lon))
             
             for forecast in weather_data['list']:
-                timestamp = datetime.fromtimestamp(forecast['dt'])
-                timestamp = timezone.localize(timestamp)
-                
-                # Get solar position
-                solar_position = location.get_solarposition(timestamp)
-                
-                # Get cloud cover and convert to clearness index
-                clouds = forecast['clouds']['all'] / 100.0
-                clearness_index = 1 - (clouds * 0.75)  # Simple conversion
-                
-                # Calculate irradiance
-                dni = pvlib.irradiance.disc(
-                    ghi=forecast['main']['temp'],  # Using temp as a simple approximation
-                    solar_zenith=solar_position['apparent_zenith'],
-                    datetime_or_doy=timestamp
-                )['dni']
-                
-                # Calculate total irradiance on tilted surface (assuming 30° tilt)
-                total_irrad = pvlib.irradiance.get_total_irradiance(
-                    surface_tilt=30,
-                    surface_azimuth=180,  # Assuming south-facing
-                    dni=dni,
-                    ghi=forecast['main']['temp'],  # Simple approximation
-                    dhi=dni * 0.2,  # Simple approximation
-                    solar_zenith=solar_position['apparent_zenith'],
-                    solar_azimuth=solar_position['azimuth']
-                )
-                
-                # Calculate power output
-                dc_power = (total_irrad['poa_global'] * max_watt_peak / 1000.0  # Convert to kW
-                          * clearness_index  # Account for cloud cover
-                          * 0.75)  # System efficiency factor
-                
-                # Store hourly production
-                production[timestamp] = max(0, dc_power)  # Ensure non-negative
+                try:
+                    timestamp = datetime.fromtimestamp(forecast['dt'])
+                    timestamp = timezone.localize(timestamp)
+                    
+                    # Get solar position
+                    solar_position = location.get_solarposition(timestamp)
+                    
+                    # Get cloud cover and convert to clearness index
+                    clouds = forecast['clouds']['all'] / 100.0
+                    clearness_index = 1 - (clouds * 0.75)  # Simple conversion
+                    
+                    # Extract actual irradiance data from weather data
+                    if 'sys' in forecast and 'pod' in forecast['sys']:
+                        is_day = forecast['sys']['pod'] == 'd'
+                    else:
+                        # Fallback to solar position
+                        is_day = solar_position['apparent_zenith'].iloc[0] < 90
+                    
+                    # Calculate GHI based on time of day and cloud cover
+                    if is_day:
+                        # Base GHI calculation (clear sky model)
+                        clearsky = location.get_clearsky(timestamp)
+                        ghi = clearsky['ghi'].iloc[0] * clearness_index
+                        
+                        # Adjust for atmospheric conditions
+                        if 'visibility' in forecast:
+                            visibility_factor = min(forecast['visibility'] / 10000.0, 1.0)
+                            ghi *= visibility_factor
+                    else:
+                        ghi = 0
+                    
+                    # Calculate DNI and DHI using DISC model
+                    disc_output = pvlib.irradiance.disc(
+                        ghi=ghi,
+                        solar_zenith=solar_position['apparent_zenith'].iloc[0],
+                        datetime_or_doy=timestamp
+                    )
+                    
+                    dni = disc_output['dni']
+                    dhi = ghi - (dni * np.cos(np.radians(solar_position['apparent_zenith'].iloc[0])))
+                    
+                    # Calculate total irradiance on tilted surface (assuming 30° tilt)
+                    total_irrad = pvlib.irradiance.get_total_irradiance(
+                        surface_tilt=30,
+                        surface_azimuth=180,  # Assuming south-facing
+                        dni=dni,
+                        ghi=ghi,
+                        dhi=dhi,
+                        solar_zenith=solar_position['apparent_zenith'].iloc[0],
+                        solar_azimuth=solar_position['azimuth'].iloc[0]
+                    )
+                    
+                    # Apply system efficiency and losses
+                    system_efficiency = 0.75  # Standard efficiency for PV systems
+                    temperature_coefficient = -0.0040  # Typical temperature coefficient (%/°C)
+                    
+                    # Temperature correction
+                    cell_temperature = forecast['main']['temp'] + (total_irrad['poa_global'] / 800.0) * 30
+                    temperature_factor = 1 + temperature_coefficient * (cell_temperature - 25)
+                    
+                    # Calculate power output
+                    dc_power = (total_irrad['poa_global'] * max_watt_peak / 1000.0  # Convert to kW
+                              * system_efficiency
+                              * temperature_factor)
+                    
+                    # Store hourly production (ensure non-negative)
+                    production[timestamp] = max(0, dc_power)
+                    
+                except KeyError as ke:
+                    logger.warning(f"Missing weather data for timestamp {timestamp}: {str(ke)}")
+                    # Use fallback calculation for missing data
+                    if is_day:
+                        production[timestamp] = max_watt_peak * 0.2 * clearness_index / 1000.0
+                    else:
+                        production[timestamp] = 0.0
+                except Exception as e:
+                    logger.error(f"Error processing forecast at {timestamp}: {str(e)}")
+                    production[timestamp] = 0.0
             
             return production
         except Exception as e:
-            print(f"Error calculating solar production: {str(e)}")
+            logger.error(f"Error calculating solar production: {str(e)}")
             return {}
 
     def _get_timezone(self, lat: float, lon: float) -> str:
@@ -143,7 +192,8 @@ class WeatherService:
             )
             data = response.json()
             return data.get('zoneName', 'Europe/Amsterdam')  # Default to Amsterdam
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Error getting timezone: {str(e)}")
             return 'Europe/Amsterdam'  # Default timezone
 
     def get_pv_forecast(self, max_watt_peak: float) -> Dict[datetime, float]:
@@ -161,5 +211,5 @@ class WeatherService:
             
             return production
         except Exception as e:
-            print(f"Error getting PV forecast: {str(e)}")
+            logger.error(f"Error getting PV forecast: {str(e)}")
             return {}
