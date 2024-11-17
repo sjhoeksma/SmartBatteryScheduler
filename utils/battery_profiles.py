@@ -62,50 +62,47 @@ class BatteryProfileManager:
         """Load default battery profiles"""
         defaults = {
             "Home Battery":
-            BatteryProfile(name="Home Battery",
-                          capacity=20,
-                          empty_soc=0.1,
-                          min_soc=0.2,
-                          max_soc=0.9,
-                          charge_rate=12.0,
-                          daily_consumption=9.0,
-                          usage_pattern="Day-heavy",
-                          yearly_consumption=3475.0,
-                          surcharge_rate=0.030,
-                          max_daily_cycles=1.5,
-                          max_charge_events=2,
-                          max_discharge_events=1,
-                          max_watt_peak=5000.0),  # 5kWp default PV installation
+            BatteryProfile(
+                name="Home Battery",
+                capacity=20,
+                empty_soc=0.1,
+                min_soc=0.2,
+                max_soc=0.9,
+                charge_rate=12.0,
+                daily_consumption=9.0,
+                usage_pattern="Day-heavy",
+                yearly_consumption=3475.0,
+                surcharge_rate=0.030,
+                max_daily_cycles=1.5,
+                max_watt_peak=5000.0),  # 5kWp default PV installation
             "EV Battery":
-            BatteryProfile(name="EV Battery",
-                          capacity=75.0,
-                          empty_soc=0.1,
-                          min_soc=0.2,
-                          max_soc=0.8,
-                          charge_rate=11.0,
-                          daily_consumption=20.0,
-                          usage_pattern="Night-heavy",
-                          yearly_consumption=7300.0,
-                          surcharge_rate=0.03,
-                          max_daily_cycles=2.0,
-                          max_charge_events=1,
-                          max_discharge_events=1,
-                          max_watt_peak=3000.0),  # 3kWp default PV installation
+            BatteryProfile(
+                name="EV Battery",
+                capacity=75.0,
+                empty_soc=0.1,
+                min_soc=0.2,
+                max_soc=0.8,
+                charge_rate=11.0,
+                daily_consumption=20.0,
+                usage_pattern="Night-heavy",
+                yearly_consumption=7300.0,
+                surcharge_rate=0.03,
+                max_daily_cycles=2.0,
+                max_watt_peak=3000.0),  # 3kWp default PV installation
             "Small Battery":
-            BatteryProfile(name="Small Battery",
-                          capacity=5.0,
-                          empty_soc=0.1,
-                          min_soc=0.15,
-                          max_soc=0.85,
-                          charge_rate=3.3,
-                          daily_consumption=8.0,
-                          usage_pattern="Flat",
-                          yearly_consumption=2920.0,
-                          surcharge_rate=0.03,
-                          max_daily_cycles=2.0,
-                          max_charge_events=3,
-                          max_discharge_events=2,
-                          max_watt_peak=2000.0)  # 2kWp default PV installation
+            BatteryProfile(
+                name="Small Battery",
+                capacity=5.0,
+                empty_soc=0.1,
+                min_soc=0.15,
+                max_soc=0.85,
+                charge_rate=3.3,
+                daily_consumption=8.0,
+                usage_pattern="Flat",
+                yearly_consumption=2920.0,
+                surcharge_rate=0.03,
+                max_daily_cycles=2.0,
+                max_watt_peak=2000.0)  # 2kWp default PV installation
         }
         self.profiles.update(defaults)
 

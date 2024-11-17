@@ -83,9 +83,6 @@ def render_power_flow(battery):
         home_from_pv = pv_to_home  # Home consumption from PV
         home_from_grid = max(0, home_consumption - home_from_battery - home_from_pv)  # Home consumption from grid
         
-        # Check if solar should be shown
-        show_solar = battery.max_watt_peak > 0 and pv_production > 0.1
-        
         with display_container.container():
             cols = st.columns(4)  # Added one more column for PV
             
@@ -106,35 +103,33 @@ def render_power_flow(battery):
                         delta=get_text("return")
                     )
             
-            # PV metrics (with conditional rendering)
+            # PV metrics with updated conditional rendering
             with cols[1]:
                 st.markdown("### Solar Production")
-                if show_solar:
+                if battery.max_watt_peak > 0:  # Only show if PV is configured
                     st.metric(
                         "Total PV Production ☀️",
                         f"{pv_production:.1f} kW",
-                        delta="Generating"
+                        delta="Generating" if pv_production > 0.1 else "No Production"
                     )
-                    if pv_to_home > 0:
-                        st.metric(
-                            f"PV to Home {get_flow_direction(-pv_to_home)}",
-                            f"{pv_to_home:.1f} kW",
-                            delta="Self-consumption"
-                        )
-                    if pv_to_battery > 0:
-                        st.metric(
-                            f"PV to Battery {get_flow_direction(pv_to_battery)}",
-                            f"{pv_to_battery:.1f} kW",
-                            delta="Charging"
-                        )
-                    if pv_to_grid > 0:
-                        st.metric(
-                            f"PV to Grid {get_flow_direction(-pv_to_grid)}",
-                            f"{pv_to_grid:.1f} kW",
-                            delta="Export"
-                        )
+                    # Show PV flows even when they are zero
+                    st.metric(
+                        f"PV to Home {get_flow_direction(-pv_to_home)}",
+                        f"{pv_to_home:.1f} kW",
+                        delta="Self-consumption" if pv_to_home > 0.1 else "No Flow"
+                    )
+                    st.metric(
+                        f"PV to Battery {get_flow_direction(pv_to_battery)}",
+                        f"{pv_to_battery:.1f} kW",
+                        delta="Charging" if pv_to_battery > 0.1 else "No Flow"
+                    )
+                    st.metric(
+                        f"PV to Grid {get_flow_direction(-pv_to_grid)}",
+                        f"{pv_to_grid:.1f} kW",
+                        delta="Export" if pv_to_grid > 0.1 else "No Flow"
+                    )
                 else:
-                    st.info("No PV installation configured" if battery.max_watt_peak == 0 else "No solar production")
+                    st.info("No PV installation configured")
             
             # Battery metrics
             with cols[2]:
@@ -207,13 +202,13 @@ def render_power_flow(battery):
             if battery_to_grid > 0:
                 status_messages.append("🔋 Battery → ⚡ Grid")
 
-            # Add PV flow messages only when solar is active
-            if show_solar:
-                if pv_to_home > 0:
+            # Add PV flow messages when PV is configured
+            if battery.max_watt_peak > 0:
+                if pv_to_home > 0.1:
                     status_messages.append("☀️ PV → 🏠 Home")
-                if pv_to_battery > 0:
+                if pv_to_battery > 0.1:
                     status_messages.append("☀️ PV → 🔋 Battery")
-                if pv_to_grid > 0:
+                if pv_to_grid > 0.1:
                     status_messages.append("☀️ PV → ⚡ Grid")
             
             # Default message if no active flows

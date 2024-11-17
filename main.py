@@ -18,9 +18,9 @@ from utils.object_store import ObjectStore
 from utils.weather_service import WeatherService
 
 st.set_page_config(page_title="Energy Management Dashboard",
-                  page_icon="⚡",
-                  layout="wide",
-                  initial_sidebar_state="collapsed")
+                   page_icon="⚡",
+                   layout="wide",
+                   initial_sidebar_state="collapsed")
 
 
 def get_max_forecast_hours():
@@ -72,8 +72,6 @@ def main():
                 yearly_consumption=default_profile.yearly_consumption,
                 monthly_distribution=default_profile.monthly_distribution,
                 max_daily_cycles=default_profile.max_daily_cycles,
-                max_charge_events=default_profile.max_charge_events,
-                max_discharge_events=default_profile.max_discharge_events,
                 surcharge_rate=default_profile.surcharge_rate,
                 max_watt_peak=default_profile.max_watt_peak)
 
@@ -120,7 +118,7 @@ def main():
 
             if prices is not None and st.session_state.battery:
                 render_price_chart(prices, schedule, predicted_soc,
-                                 consumption_stats)
+                                   consumption_stats)
             else:
                 st.warning("No price data available")
 
@@ -135,10 +133,10 @@ def main():
     with tab2:
         if st.session_state.battery:
             render_manual_battery_control(st.session_state.battery,
-                                       prices=prices,
-                                       schedule=schedule,
-                                       predicted_soc=predicted_soc,
-                                       consumption_stats=consumption_stats)
+                                          prices=prices,
+                                          schedule=schedule,
+                                          predicted_soc=predicted_soc,
+                                          consumption_stats=consumption_stats)
         else:
             st.warning("Please configure battery settings first")
 
@@ -153,7 +151,7 @@ def main():
         historical_prices = generate_historical_prices(days=30)
         if st.session_state.battery:
             render_historical_analysis(historical_prices,
-                                     st.session_state.battery)
+                                       st.session_state.battery)
         else:
             st.warning("Please configure battery settings first")
 

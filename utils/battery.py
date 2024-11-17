@@ -18,8 +18,6 @@ class Battery:
                  monthly_distribution=None,
                  surcharge_rate=0.050,
                  max_daily_cycles=1.5,
-                 max_charge_events=2,
-                 max_discharge_events=1,
                  max_watt_peak=0.0):
         self.capacity = capacity
         self.empty_soc = empty_soc
@@ -46,13 +44,9 @@ class Battery:
         }
         self.surcharge_rate = round(float(surcharge_rate), 3)
         self.max_daily_cycles = max_daily_cycles
-        self.max_charge_events = max_charge_events
-        self.max_discharge_events = max_discharge_events
         self.max_watt_peak = max_watt_peak
         self._current_power = 0.0
         self._daily_cycles = 0.0
-        self._charge_events = 0
-        self._discharge_events = 0
         self._last_reset = datetime.now().date()
         try:
             self.ecactus_client = get_ecactus_client()
@@ -66,8 +60,6 @@ class Battery:
         current_date = datetime.now().date()
         if current_date > self._last_reset:
             self._daily_cycles = 0.0
-            self._charge_events = 0
-            self._discharge_events = 0
             self._last_reset = current_date
 
     def _can_add_charge_event(self):
@@ -85,11 +77,6 @@ class Battery:
         self._reset_daily_counters_if_needed()
         cycle_fraction = abs(energy_amount) / self.capacity
         self._daily_cycles += cycle_fraction
-
-        if energy_amount > 0:
-            self._charge_events += 1
-        elif energy_amount < 0:
-            self._discharge_events += 1
 
     def can_complete_operation(self, energy_amount):
         """Check if the operation would exceed any limits"""
@@ -191,7 +178,7 @@ class Battery:
         else:
             if 0 <= hour < 6:
                 return min(self.charge_rate * 0.8,
-                         self.get_available_capacity())
+                           self.get_available_capacity())
             elif 10 <= hour < 16:
                 return -min(self.charge_rate * 0.6, consumption)
             else:

@@ -129,16 +129,14 @@ def render_battery_config():
                                 min_value=0.5,
                                 max_value=1.0,
                                 value=float(profile.max_soc))
-
-            # Add PV configuration
-            max_watt_peak = st.number_input(
-                "PV Installation Size (Wp)",
-                min_value=0.0,
-                max_value=20000.0,
-                value=float(profile.max_watt_peak),
-                step=100.0,
-                help="Maximum power output of your PV installation in Watt peak"
-            )
+            # Add maximum daily cycles input
+            max_daily_cycles = st.number_input(get_text("max_daily_cycles"),
+                                               min_value=0.1,
+                                               max_value=5.0,
+                                               value=float(
+                                                   profile.max_daily_cycles),
+                                               step=0.1,
+                                               format="%.1f")
 
         with col2:
             surcharge_rate = st.number_input(
@@ -169,37 +167,15 @@ def render_battery_config():
                                          index=[
                                              "Flat", "Day-heavy", "Night-heavy"
                                          ].index(profile.usage_pattern))
-
-        # Cycle and Event Limits Section
-        st.markdown("### Event Limits")
-        st.info(get_text('cycle_limits_help'))
-
-        # Add maximum daily cycles input
-        max_daily_cycles = st.number_input(get_text("max_daily_cycles"),
-                                           min_value=0.1,
-                                           max_value=5.0,
-                                           value=float(
-                                               profile.max_daily_cycles),
-                                           step=0.1,
-                                           format="%.1f")
-
-        # Add event limits inputs sequentially
-        max_charge_events = st.number_input(
-            "Maximum Daily Charge Events",
-            min_value=1,
-            max_value=10,
-            value=int(profile.max_charge_events),
-            help=
-            "Maximum number of times the battery can start charging per day")
-
-        max_discharge_events = st.number_input(
-            "Maximum Daily Discharge Events",
-            min_value=1,
-            max_value=10,
-            value=int(profile.max_discharge_events),
-            help=
-            "Maximum number of times the battery can start discharging per day"
-        )
+            # Add PV configuration
+            max_watt_peak = st.number_input(
+                "PV Installation Size (Wp)",
+                min_value=0.0,
+                max_value=20000.0,
+                value=float(profile.max_watt_peak),
+                step=100.0,
+                help="Maximum power output of your PV installation in Watt peak"
+            )
 
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(
@@ -221,8 +197,6 @@ def render_battery_config():
                 monthly_distribution=profile.monthly_distribution,
                 surcharge_rate=round(surcharge_rate, 3),
                 max_daily_cycles=max_daily_cycles,
-                max_charge_events=max_charge_events,
-                max_discharge_events=max_discharge_events,
                 max_watt_peak=max_watt_peak)
 
             # Save updated profile and update battery instance
@@ -242,8 +216,6 @@ def render_battery_config():
                 monthly_distribution=profile.monthly_distribution,
                 surcharge_rate=round(surcharge_rate, 3),
                 max_daily_cycles=max_daily_cycles,
-                max_charge_events=max_charge_events,
-                max_discharge_events=max_discharge_events,
                 max_watt_peak=max_watt_peak)
 
             # Clear optimization cache to force schedule recalculation
@@ -271,8 +243,6 @@ def render_battery_config():
                     monthly_distribution=profile.monthly_distribution,
                     surcharge_rate=round(surcharge_rate, 3),
                     max_daily_cycles=max_daily_cycles,
-                    max_charge_events=max_charge_events,
-                    max_discharge_events=max_discharge_events,
                     max_watt_peak=max_watt_peak)
                 st.session_state.store.save_profile(new_profile)
 
@@ -290,8 +260,6 @@ def render_battery_config():
                     monthly_distribution=profile.monthly_distribution,
                     surcharge_rate=round(surcharge_rate, 3),
                     max_daily_cycles=max_daily_cycles,
-                    max_charge_events=max_charge_events,
-                    max_discharge_events=max_discharge_events,
                     max_watt_peak=max_watt_peak)
 
                 # Clear optimization cache to force schedule recalculation

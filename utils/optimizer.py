@@ -102,11 +102,7 @@ def optimize_schedule(_prices, _battery):
 
         # Initialize daily tracking if needed
         if current_date not in daily_events:
-            daily_events[current_date] = {
-                'charge_events': 0,
-                'discharge_events': 0,
-                'cycles': 0.0
-            }
+            daily_events[current_date] = {'cycles': 0.0}
 
         # Get daily thresholds
         thresholds = daily_thresholds[current_date]
@@ -123,15 +119,16 @@ def optimize_schedule(_prices, _battery):
         look_ahead_end = min(i + look_ahead_window, periods)
         future_prices = effective_prices.iloc[i + 1:look_ahead_end]
         future_max_price = future_prices.max() if len(future_prices) > 0 else 0
-        future_min_price = future_prices.min() if len(future_prices) > 0 else future_max_price
+        future_min_price = future_prices.min() if len(
+            future_prices) > 0 else future_max_price
 
         # Add strict peak detection with higher threshold
         is_peak = current_price >= future_prices.quantile(0.95) if len(
-            future_prices) > 0 else True  
+            future_prices) > 0 else True
 
-        is_valley = current_price <=future_prices.quantile(0.10) if len(
-             future_prices) > 0 else True  
-      
+        is_valley = current_price <= future_prices.quantile(0.10) if len(
+            future_prices) > 0 else True
+
         # Optimize charging/discharging decision with bounds checking
         available_capacity = _battery.capacity * (_battery.max_soc -
                                                   current_soc)
@@ -145,19 +142,17 @@ def optimize_schedule(_prices, _battery):
         if remaining_cycles > 0:
             # Charging decision with relative threshold
             relative_charge_threshold = thresholds['rolling_mean'] * 0.98
-            if (is_valley and current_price <= relative_charge_threshold 
-                    and future_min_price!=future_max_price
-                    and daily_events[current_date]['charge_events']
-                    < _battery.max_charge_events and available_capacity > 0):
+            if (is_valley and current_price <= relative_charge_threshold
+                    and future_min_price != future_max_price
+                    and available_capacity > 0):
                 max_allowed_charge = min(
                     available_capacity,  # Remove hardcoded value
                     _battery.charge_rate,  # Use battery's actual charge rate
                     remaining_cycles * _battery.capacity)
-                
+
                 # If we cannot load the full charge any more look if there is a better option within the same
                 if max_allowed_charge > 0:
                     schedule[i] = max_allowed_charge
-                    daily_events[current_date]['charge_events'] += 1
                     daily_events[current_date][
                         'cycles'] += max_allowed_charge / _battery.capacity
 
@@ -167,18 +162,15 @@ def optimize_schedule(_prices, _battery):
                 pass  # Skip discharge, better prices coming, but calcuated SOC
 
             # Discharging decision with peak detection and relative threshold
-            elif (is_peak and future_max_price!=0 and current_price >= future_max_price * 0.98
-                  and  # Changed from 0.95 to 0.98
-                  daily_events[current_date]['discharge_events']
-                  < _battery.max_discharge_events and
-                  available_discharge - current_hour_consumption > 0):
+            elif (is_peak and future_max_price != 0
+                  and current_price >= future_max_price * 0.98
+                  and available_discharge - current_hour_consumption > 0):
                 max_allowed_discharge = min(
                     _battery.charge_rate,
                     available_discharge - current_hour_consumption,
                     remaining_cycles * _battery.capacity)
                 if max_allowed_discharge > 0:
                     schedule[i] = -max_allowed_discharge
-                    daily_events[current_date]['discharge_events'] += 1
                     daily_events[current_date][
                         'cycles'] += max_allowed_discharge / _battery.capacity
 
