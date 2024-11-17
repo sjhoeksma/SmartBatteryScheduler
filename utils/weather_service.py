@@ -21,15 +21,17 @@ class WeatherService:
         self.api_key = os.getenv('OPENWEATHERMAP_API_KEY')
         if not self.api_key:
             raise ValueError("OpenWeatherMap API key not found in environment variables")
-        
+
         self.base_url = "http://api.openweathermap.org/data/2.5"
         self._location_cache = None
         self._weather_cache = {}
         self._cache_duration = timedelta(minutes=30)
         self._last_cache_time = None
-        self._cache_file = Path('.cache/location_cache.pkl')
+        self._cache_file = Path('.DB/location_cache.pkl')
         self._last_api_call = 0
         self._api_call_interval = 1.0  # Minimum interval between API calls in seconds
+        self._max_retries = 3  # Maximum number of API call retries
+        self._retry_delay = 2  # Delay between retries in seconds
         self._load_cached_location()
 
     def _wait_for_rate_limit(self):
@@ -107,173 +109,276 @@ class WeatherService:
         return default_location
 
     def get_weather_data(self, lat: float, lon: float) -> Dict:
-        """Get weather data from OpenWeatherMap API"""
+        """Get weather data from OpenWeatherMap API with enhanced error handling and retries"""
         cache_key = f"{lat},{lon}"
         current_time = datetime.now()
 
         # Check cache
-        if (self._last_cache_time and
-            cache_key in self._weather_cache and
-            current_time - self._last_cache_time < self._cache_duration):
+        if (self._last_cache_time and cache_key in self._weather_cache and
+                current_time - self._last_cache_time < self._cache_duration):
             return self._weather_cache[cache_key]
 
-        # Implement rate limiting
-        self._wait_for_rate_limit()
+        for retry in range(self._max_retries):
+            try:
+                self._wait_for_rate_limit()
+                
+                response = requests.get(
+                    f"{self.base_url}/forecast",
+                    params={
+                        'lat': lat,
+                        'lon': lon,
+                        'appid': self.api_key,
+                        'units': 'metric'
+                    },
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
 
-        # Fetch new data
-        try:
-            response = requests.get(
-                f"{self.base_url}/forecast",
-                params={
-                    'lat': lat,
-                    'lon': lon,
-                    'appid': self.api_key,
-                    'units': 'metric'
-                },
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            # Cache the response
-            self._weather_cache[cache_key] = data
-            self._last_cache_time = current_time
-            
-            return data
-        except Exception as e:
-            logger.error(f"Error fetching weather data: {str(e)}")
-            raise Exception(f"Error fetching weather data: {str(e)}")
+                # Validate response structure
+                if not isinstance(data, dict):
+                    raise ValueError("Invalid response format: not a dictionary")
+
+                if 'list' not in data:
+                    raise ValueError("Invalid response format: missing 'list' key")
+
+                if not isinstance(data['list'], list) or not data['list']:
+                    raise ValueError("Invalid response format: empty or invalid forecast list")
+
+                # Cache the validated response
+                self._weather_cache[cache_key] = data
+                self._last_cache_time = current_time
+
+                return data
+
+            except requests.RequestException as e:
+                logger.warning(f"API request failed (attempt {retry + 1}/{self._max_retries}): {str(e)}")
+                if retry < self._max_retries - 1:
+                    time.sleep(self._retry_delay * (retry + 1))
+            except ValueError as e:
+                logger.error(f"Invalid API response: {str(e)}")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error: {str(e)}")
+                break
+
+        # Return cached data if available, otherwise raise exception
+        if cache_key in self._weather_cache:
+            logger.warning("Using cached weather data due to API failure")
+            return self._weather_cache[cache_key]
+        
+        raise Exception("Failed to fetch weather data after multiple attempts")
 
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float,
                                  lat: float, lon: float) -> Dict[datetime, float]:
-        """Calculate expected solar production based on weather data"""
+        """Calculate expected solar production based on weather data with enhanced error handling"""
         try:
+            # Validate input parameters
+            if not isinstance(weather_data, dict):
+                raise ValueError("Weather data must be a dictionary")
+            if not isinstance(max_watt_peak, (int, float)) or max_watt_peak <= 0:
+                raise ValueError("Invalid max_watt_peak value")
+
             # Create location object
             location = Location(latitude=lat, longitude=lon)
-            
-            # Initialize results dictionary
             production = {}
             
             # Get timezone for the location
             timezone = pytz.timezone(self._get_timezone(lat, lon))
-            
-            for forecast in weather_data.get('list', []):
+
+            # Validate weather data structure
+            if 'list' not in weather_data:
+                raise ValueError("Missing 'list' key in weather data")
+
+            for forecast in weather_data['list']:
                 try:
+                    # Validate required forecast data
+                    if not isinstance(forecast, dict):
+                        logger.warning("Invalid forecast entry format")
+                        continue
+
+                    required_keys = ['dt', 'clouds', 'main']
+                    if not all(key in forecast for key in required_keys):
+                        logger.warning(f"Missing required keys in forecast: {required_keys}")
+                        continue
+
+                    # Process timestamp
                     timestamp = datetime.fromtimestamp(forecast['dt'])
                     timestamp = timezone.localize(timestamp)
-                    
-                    # Get solar position for current timestamp
+
+                    # Get solar position
                     solar_position = location.get_solarposition(timestamp)
                     
-                    # Get cloud cover and convert to clearness index
-                    clouds = forecast['clouds']['all'] / 100.0
-                    clearness_index = 1 - (clouds * 0.75)  # Simple conversion
-                    
+                    # Validate solar position data
+                    if solar_position.empty:
+                        logger.warning(f"Empty solar position data for timestamp: {timestamp}")
+                        continue
+
+                    # Extract and validate cloud cover
+                    try:
+                        clouds = forecast['clouds'].get('all', 100) / 100.0
+                        clearness_index = 1 - (clouds * 0.75)
+                    except (KeyError, TypeError, ValueError) as e:
+                        logger.warning(f"Error processing cloud cover: {str(e)}")
+                        clearness_index = 0.25  # Conservative default
+
                     # Determine if it's daytime
                     zenith = solar_position['apparent_zenith'].iloc[0]
                     is_day = zenith < 90
-                    
+
                     if is_day:
-                        # Calculate clear sky radiation
-                        clearsky = location.get_clearsky(timestamp)
-                        ghi = clearsky['ghi'].iloc[0] * clearness_index
-                        
-                        # Adjust for atmospheric conditions
-                        if 'visibility' in forecast:
-                            visibility_factor = min(forecast['visibility'] / 10000.0, 1.0)
-                            ghi *= visibility_factor
+                        try:
+                            # Calculate clear sky radiation
+                            clearsky = location.get_clearsky(timestamp)
+                            if clearsky.empty:
+                                raise ValueError("Empty clearsky data")
+                            
+                            ghi = clearsky['ghi'].iloc[0] * clearness_index
+
+                            # Apply visibility factor if available
+                            if 'visibility' in forecast:
+                                visibility_factor = min(forecast['visibility'] / 10000.0, 1.0)
+                                ghi *= visibility_factor
+
+                        except Exception as e:
+                            logger.warning(f"Error calculating GHI: {str(e)}")
+                            ghi = 0.0
                     else:
                         ghi = 0.0
 
-                    # Calculate DNI using DISC model
-                    disc_output = pvlib.irradiance.disc(
-                        ghi=ghi,
-                        solar_zenith=zenith,
-                        datetime_or_doy=timestamp
-                    )
-                    
-                    dni = disc_output['dni']
-                    dhi = ghi - (dni * np.cos(np.radians(zenith)))
-                    
-                    # Calculate total irradiance on tilted surface
-                    total_irrad = pvlib.irradiance.get_total_irradiance(
-                        surface_tilt=30,
-                        surface_azimuth=180,  # Assuming south-facing
-                        dni=dni,
-                        ghi=ghi,
-                        dhi=dhi,
-                        solar_zenith=zenith,
-                        solar_azimuth=solar_position['azimuth'].iloc[0]
-                    )
-                    
-                    # Apply system efficiency and losses
-                    system_efficiency = 0.75  # Standard efficiency for PV systems
-                    temperature_coefficient = -0.0040  # Typical temperature coefficient (%/°C)
-                    
-                    # Temperature correction
-                    cell_temperature = forecast['main']['temp'] + (total_irrad['poa_global'] / 800.0) * 30
-                    temperature_factor = 1 + temperature_coefficient * (cell_temperature - 25)
-                    
-                    # Calculate power output
-                    dc_power = (total_irrad['poa_global'] * max_watt_peak / 1000.0  # Convert to kW
-                              * system_efficiency
-                              * temperature_factor)
-                    
-                    # Store hourly production (ensure non-negative)
-                    production[timestamp] = max(0, dc_power)
-                    
+                    # Calculate solar irradiance components
+                    try:
+                        disc_output = pvlib.irradiance.disc(
+                            ghi=ghi,
+                            solar_zenith=zenith,
+                            datetime_or_doy=timestamp
+                        )
+                        
+                        dni = disc_output['dni']
+                        dhi = ghi - (dni * np.cos(np.radians(zenith)))
+
+                        # Calculate total irradiance
+                        total_irrad = pvlib.irradiance.get_total_irradiance(
+                            surface_tilt=30,
+                            surface_azimuth=180,  # Assuming south-facing
+                            dni=dni,
+                            ghi=ghi,
+                            dhi=dhi,
+                            solar_zenith=zenith,
+                            solar_azimuth=solar_position['azimuth'].iloc[0]
+                        )
+
+                        # Apply system efficiency and thermal derating
+                        system_efficiency = 0.75
+                        temperature_coefficient = -0.0040
+
+                        # Get temperature and apply thermal derating
+                        try:
+                            ambient_temp = forecast['main'].get('temp', 25)
+                            cell_temperature = ambient_temp + (total_irrad['poa_global'] / 800.0) * 30
+                            temperature_factor = 1 + temperature_coefficient * (cell_temperature - 25)
+                        except (KeyError, TypeError) as e:
+                            logger.warning(f"Error calculating temperature factor: {str(e)}")
+                            temperature_factor = 1.0
+
+                        # Calculate final power output
+                        dc_power = (
+                            total_irrad['poa_global'] * max_watt_peak / 1000.0  # Convert to kW
+                            * system_efficiency * temperature_factor
+                        )
+
+                        # Store non-negative production value
+                        production[timestamp] = max(0, dc_power)
+
+                    except Exception as e:
+                        logger.warning(f"Error in irradiance calculations: {str(e)}")
+                        # Fallback to simplified calculation
+                        if is_day:
+                            production[timestamp] = max_watt_peak * 0.2 * clearness_index / 1000.0
+                        else:
+                            production[timestamp] = 0.0
+
                 except Exception as e:
                     logger.error(f"Error processing forecast at {timestamp}: {str(e)}")
-                    # Use simplified calculation for missing data
-                    if is_day:
-                        production[timestamp] = max_watt_peak * 0.2 * clearness_index / 1000.0
-                    else:
-                        production[timestamp] = 0.0
-            
+                    continue
+
+            if not production:
+                logger.warning("No production values were calculated")
+                return {}
+
             return production
+
         except Exception as e:
             logger.error(f"Error calculating solar production: {str(e)}")
             return {}
 
     def _get_timezone(self, lat: float, lon: float) -> str:
-        """Get timezone string for given coordinates"""
-        try:
-            self._wait_for_rate_limit()
-            response = requests.get(
-                "http://api.timezonedb.com/v2.1/get-time-zone",
-                params={
-                    'key': os.getenv('TIMEZONEDB_API_KEY', 'dummy'),
-                    'format': 'json',
-                    'by': 'position',
-                    'lat': lat,
-                    'lng': lon
-                },
-                timeout=5
-            )
-            data = response.json()
-            return data.get('zoneName', 'Europe/Amsterdam')
-        except Exception as e:
-            logger.warning(f"Error getting timezone: {str(e)}")
-            return 'Europe/Amsterdam'
+        """Get timezone string for given coordinates with retries"""
+        for retry in range(self._max_retries):
+            try:
+                self._wait_for_rate_limit()
+                response = requests.get(
+                    "http://api.timezonedb.com/v2.1/get-time-zone",
+                    params={
+                        'key': os.getenv('TIMEZONEDB_API_KEY', 'dummy'),
+                        'format': 'json',
+                        'by': 'position',
+                        'lat': lat,
+                        'lng': lon
+                    },
+                    timeout=5
+                )
+                response.raise_for_status()
+                data = response.json()
+                timezone = data.get('zoneName')
+                if timezone:
+                    return timezone
+            except Exception as e:
+                logger.warning(f"Error getting timezone (attempt {retry + 1}/{self._max_retries}): {str(e)}")
+                if retry < self._max_retries - 1:
+                    time.sleep(self._retry_delay)
+
+        logger.warning("Using default timezone: Europe/Amsterdam")
+        return 'Europe/Amsterdam'
 
     def get_pv_forecast(self, max_watt_peak: float) -> Dict[datetime, float]:
-        """Get PV production forecast for the next 36 hours"""
+        """Get PV production forecast for the next 36 hours with enhanced error handling"""
         try:
+            # Validate input
+            if not isinstance(max_watt_peak, (int, float)):
+                raise ValueError("Invalid max_watt_peak type")
+
             if max_watt_peak <= 0:
                 logger.info("No PV installation configured (max_watt_peak <= 0)")
                 return {}
 
-            # Get location
-            lat, lon = self.get_location_from_ip()
-            
-            # Get weather data
-            weather_data = self.get_weather_data(lat, lon)
-            
+            # Get location with retry
+            for retry in range(self._max_retries):
+                try:
+                    lat, lon = self.get_location_from_ip()
+                    break
+                except Exception as e:
+                    if retry == self._max_retries - 1:
+                        logger.error(f"Failed to get location after {self._max_retries} attempts: {str(e)}")
+                        return {}
+                    time.sleep(self._retry_delay)
+
+            # Get weather data with retry
+            try:
+                weather_data = self.get_weather_data(lat, lon)
+            except Exception as e:
+                logger.error(f"Failed to get weather data: {str(e)}")
+                return {}
+
             # Calculate production
-            production = self.calculate_solar_production(
-                weather_data, max_watt_peak, lat, lon)
+            production = self.calculate_solar_production(weather_data, max_watt_peak, lat, lon)
             
+            if not production:
+                logger.warning("No production values calculated, returning empty forecast")
+                return {}
+
             return production
+
         except Exception as e:
             logger.error(f"Error getting PV forecast: {str(e)}")
             return {}
