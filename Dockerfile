@@ -13,9 +13,8 @@ COPY components/ components/
 COPY utils/ utils/
 COPY .streamlit/ .streamlit/
 
-
-# Install dependencies
-RUN pip install --no-cache-dir streamlit pandas numpy plotly
+# Install dependencies using the pyproject.toml
+RUN pip install -e .
 
 # Expose port 5000
 EXPOSE 5000
