@@ -13,6 +13,7 @@ from pathlib import Path
 import time
 import streamlit as st
 import pandas as pd
+from scipy.interpolate import interp1d
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +40,7 @@ class WeatherService:
 
     def _cleanup_cache(self):
         """Remove expired entries from weather cache"""
-        current_time = datetime.now()
+        current_time = datetime.now(pytz.UTC)
         expired_keys = [
             key for key, last_time in self._last_cache_time.items()
             if current_time - last_time > self._cache_ttl
@@ -83,7 +84,7 @@ class WeatherService:
         return default_tz
 
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float, lat: float, lon: float) -> Dict[datetime, float]:
-        """Calculate expected solar production based on weather data with enhanced solar calculations"""
+        """Calculate expected solar production based on weather data"""
         if not isinstance(weather_data, dict) or 'list' not in weather_data:
             logger.error("Invalid weather data format")
             return {}
@@ -102,52 +103,37 @@ class WeatherService:
 
         for forecast in weather_data['list']:
             try:
-                if not isinstance(forecast, dict):
-                    continue
-
-                # Convert timestamp to timezone-aware datetime
-                timestamp = datetime.fromtimestamp(forecast['dt'], tz=pytz.UTC)
+                timestamp = datetime.fromtimestamp(forecast['dt']).replace(tzinfo=pytz.UTC)
                 local_timestamp = timestamp.astimezone(timezone)
 
-                # Create a pandas DatetimeIndex for solar calculations
+                # Create solar position calculation times
                 times = pd.DatetimeIndex([local_timestamp])
-
-                # Calculate solar position
-                solar_position = location.get_solarposition(times=times, temperature=forecast.get('main', {}).get('temp', 25))
                 
-                # Calculate extra terrestrial DNI
-                dni_extra = pvlib.irradiance.get_extra_radiation(times)
+                # Calculate solar position
+                solar_position = location.get_solarposition(times=times)
 
                 # Check if sun is below horizon
                 if solar_position['apparent_elevation'].iloc[0] <= 0:
                     production[timestamp] = 0.0
-                    logger.debug(f"Night time at {local_timestamp}, production: 0.0 kW")
                     continue
 
-                # Get cloud cover with validation
-                clouds = forecast.get('clouds', {}).get('all', 100)
-                if not isinstance(clouds, (int, float)):
-                    clouds = 100
-                clouds = min(max(0, clouds), 100) / 100.0
+                # Get cloud cover
+                clouds = min(max(0, forecast.get('clouds', {}).get('all', 100)), 100) / 100.0
 
                 # Calculate clearness index with seasonal adjustment
                 day_of_year = local_timestamp.timetuple().tm_yday
                 seasonal_factor = 1.0 + 0.03 * np.sin(2 * np.pi * (day_of_year - 81) / 365)
                 clearness_index = max(0.1, (1.0 - (clouds * 0.75)) * seasonal_factor)
 
-                # Get clear sky radiation with enhanced model
-                clearsky = location.get_clearsky(times, model='ineichen', dni_extra=dni_extra)
-                if clearsky.empty:
-                    logger.warning(f"No clearsky data available for {local_timestamp}")
-                    production[timestamp] = 0.0
-                    continue
-
+                # Calculate clear sky radiation
+                clearsky = location.get_clearsky(times, model='ineichen')
+                
                 # Calculate DNI and DHI
                 dni = float(clearsky['dni'].iloc[0]) * clearness_index
                 ghi = float(clearsky['ghi'].iloc[0]) * clearness_index
                 dhi = float(clearsky['dhi'].iloc[0]) * clearness_index
 
-                # Apply weather conditions with detailed factors
+                # Apply weather condition factors
                 weather_condition = forecast.get('weather', [{}])[0].get('main', '').lower()
                 condition_factors = {
                     'clear': 1.0,
@@ -161,7 +147,7 @@ class WeatherService:
                 }
                 weather_factor = condition_factors.get(weather_condition, 0.7)
 
-                # Calculate total irradiance on tilted surface with enhanced model
+                # Calculate total irradiance
                 surface_tilt = 30  # Typical tilt for Netherlands
                 surface_azimuth = 180  # South-facing
                 total_irrad = pvlib.irradiance.get_total_irradiance(
@@ -172,33 +158,33 @@ class WeatherService:
                     dhi=dhi,
                     solar_zenith=solar_position['apparent_zenith'].iloc[0],
                     solar_azimuth=solar_position['azimuth'].iloc[0],
-                    dni_extra=dni_extra.iloc[0],
                     model='haydavies'
                 )
 
-                # Calculate cell temperature using Sandia model
+                # Calculate cell temperature using pvsyst model
                 wind_speed = forecast.get('wind', {}).get('speed', 1.0)
-                temp_cell = pvlib.temperature.sapm_cell(
+                temp_air = forecast.get('main', {}).get('temp', 25)
+                
+                temp_cell = pvlib.temperature.pvsyst_cell(
                     poa_global=total_irrad['poa_global'],
-                    temp_air=forecast.get('main', {}).get('temp', 25),
+                    temp_air=temp_air,
                     wind_speed=wind_speed,
-                    a=-3.56,  # SAPM temperature model coefficient
-                    b=-0.075  # SAPM temperature model coefficient
+                    u_c=29.0,  # Heat transfer coefficient
+                    u_v=0  # Wind speed coefficient
                 )
 
-                # Calculate temperature-adjusted efficiency
-                temp_coefficient = -0.0040  # Standard temperature coefficient for power
-                temp_factor = 1 + temp_coefficient * (float(temp_cell) - 25)
+                # Calculate efficiency factors
+                temp_coefficient = -0.0040
+                temp_factor = 1 + temp_coefficient * (temp_cell - 25)
+                system_efficiency = 0.75
+                soiling_factor = 0.98
+                mismatch_factor = 0.98
+                wiring_factor = 0.98
+                inverter_efficiency = 0.96
 
-                # Calculate final power output with enhanced efficiency model
-                system_efficiency = 0.75  # Base system efficiency
-                soiling_factor = 0.98  # Account for panel soiling
-                mismatch_factor = 0.98  # Account for panel mismatch
-                wiring_factor = 0.98  # Account for wiring losses
-                inverter_efficiency = 0.96  # Typical inverter efficiency
-
+                # Calculate final power output
                 dc_power = (
-                    total_irrad['poa_global'] * max_watt_peak / 1000.0  # Convert to kW
+                    total_irrad['poa_global'] * max_watt_peak / 1000.0
                     * system_efficiency
                     * temp_factor
                     * weather_factor
@@ -224,35 +210,26 @@ class WeatherService:
             if not isinstance(max_watt_peak, (int, float)) or max_watt_peak <= 0:
                 return 0.0
 
-            # Get current hour in UTC
-            current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
-            current_hour = current_hour.astimezone(pytz.UTC)
-
+            current_hour = datetime.now(pytz.UTC).replace(minute=0, second=0, microsecond=0)
             lat, lon = self.get_location_from_ip()
-            weather_data = None
-
-            # Attempt to get weather data with retries
-            for retry in range(self._max_retries):
-                try:
-                    self._wait_for_rate_limit(retry)
-                    weather_data = self.get_weather_data(lat, lon)
-                    if weather_data:
-                        break
-                except Exception as e:
-                    logger.warning(f"Weather data fetch attempt {retry + 1} failed: {str(e)}")
-                    if retry < self._max_retries - 1:
-                        time.sleep(self._exponential_backoff(retry))
-
+            
+            # Get weather data
+            weather_data = self.get_weather_data(lat, lon)
             if not weather_data:
-                logger.error("Failed to get weather data after all retries")
                 return 0.0
 
             # Calculate production for all hours
             pv_forecast = self.calculate_solar_production(weather_data, max_watt_peak, lat, lon)
             
-            # Return current hour production
-            if current_hour in pv_forecast:
-                return pv_forecast[current_hour]
+            # Find the closest forecast time
+            if not pv_forecast:
+                return 0.0
+                
+            closest_time = min(pv_forecast.keys(), key=lambda x: abs(x - current_hour))
+            time_diff = abs((closest_time - current_hour).total_seconds())
+            
+            if time_diff <= 3600:  # Within 1 hour
+                return pv_forecast[closest_time]
             
             logger.warning(f"No production data available for current hour: {current_hour}")
             return 0.0
@@ -262,24 +239,21 @@ class WeatherService:
             return 0.0
 
     def get_weather_data(self, lat: float, lon: float) -> Optional[Dict]:
-        """Get weather data with improved validation and error handling"""
+        """Get weather data with caching"""
         try:
             cache_key = f"{lat},{lon}"
-            current_time = datetime.now()
+            current_time = datetime.now(pytz.UTC)
 
-            # Clean up expired cache entries
-            self._cleanup_cache()
-
-            # Check cache validity
+            # Check cache
             if (cache_key in self._weather_cache
                     and cache_key in self._last_cache_time
                     and current_time - self._last_cache_time[cache_key] < self._cache_ttl):
                 return self._weather_cache[cache_key]
 
+            # Fetch new data
             for retry in range(self._max_retries):
                 try:
                     self._wait_for_rate_limit(retry)
-
                     response = requests.get(
                         f"{self.base_url}/forecast",
                         params={
@@ -292,50 +266,24 @@ class WeatherService:
                     )
 
                     if response.status_code == 429:
-                        logger.warning("OpenWeatherMap API rate limit reached")
-                        if retry < self._max_retries - 1:
-                            time.sleep(self._exponential_backoff(retry))
+                        logger.warning("API rate limit reached")
+                        time.sleep(self._exponential_backoff(retry))
                         continue
 
                     response.raise_for_status()
                     data = response.json()
 
-                    # Validate response format
-                    if not isinstance(data, dict):
-                        raise ValueError("Invalid API response format: not a dictionary")
-                    if 'list' not in data:
-                        raise ValueError("Invalid API response format: missing 'list' key")
-                    if not isinstance(data['list'], list):
-                        raise ValueError("Invalid API response format: 'list' is not an array")
-                    if not data['list']:
-                        raise ValueError("Invalid API response format: empty forecast list")
-
-                    # Validate forecast entries
-                    for entry in data['list']:
-                        if not isinstance(entry, dict):
-                            continue
-                        if 'dt' not in entry:
-                            logger.warning("Missing timestamp in forecast entry")
-                        if 'main' not in entry or not isinstance(entry['main'], dict):
-                            logger.warning("Missing or invalid 'main' data in forecast entry")
-                        if 'clouds' not in entry or not isinstance(entry['clouds'], dict):
-                            logger.warning("Missing or invalid cloud cover data in forecast entry")
-
-                    # Update cache with new data
+                    # Update cache
                     self._weather_cache[cache_key] = data
                     self._last_cache_time[cache_key] = current_time
-
                     return data
 
                 except requests.exceptions.RequestException as e:
-                    logger.warning(f"Weather API request failed (attempt {retry + 1}): {str(e)}")
+                    logger.warning(f"API request failed (attempt {retry + 1}): {str(e)}")
                     if retry < self._max_retries - 1:
                         time.sleep(self._exponential_backoff(retry))
-                except (ValueError, KeyError) as e:
-                    logger.error(f"Invalid API response format: {str(e)}")
-                    return None
 
-            raise Exception("Failed to fetch weather data after all retries")
+            return None
 
         except Exception as e:
             logger.error(f"Error in get_weather_data: {str(e)}")
@@ -344,7 +292,6 @@ class WeatherService:
     def get_location_from_ip(self) -> Tuple[float, float]:
         """Get location with Netherlands as default"""
         logger.info(f"Using default location (Netherlands): {self._default_location}")
-        self._save_cached_location(self._default_location)
         return self._default_location
 
     def _load_cached_location(self):
@@ -354,23 +301,16 @@ class WeatherService:
                 with open(self._cache_file, 'rb') as f:
                     cache_data = pickle.load(f)
                     if isinstance(cache_data, dict):
-                        if cache_data.get('timestamp') and \
-                           datetime.now() - cache_data['timestamp'] < timedelta(days=1):
-                            self._location_cache = cache_data.get('location')
-                            logger.info(f"Loaded valid cached location: {self._location_cache}")
-                            return
-                    logger.info("Cache expired or invalid")
+                        self._location_cache = cache_data.get('location')
         except Exception as e:
-            logger.warning(f"Failed to load cached location: {str(e)}")
+            logger.warning(f"Failed to load location cache: {str(e)}")
 
     def _save_cached_location(self, location: Tuple[float, float]):
         """Save location to cache file"""
         try:
-            self._cache_file.parent.mkdir(parents=True, exist_ok=True)
-            cache_data = {'location': location, 'timestamp': datetime.now()}
+            os.makedirs(os.path.dirname(self._cache_file), exist_ok=True)
+            cache_data = {'location': location, 'timestamp': datetime.now(pytz.UTC)}
             with open(self._cache_file, 'wb') as f:
                 pickle.dump(cache_data, f)
-            self._location_cache = location
-            logger.info(f"Saved location to cache: {location}")
         except Exception as e:
             logger.warning(f"Failed to save location to cache: {str(e)}")
