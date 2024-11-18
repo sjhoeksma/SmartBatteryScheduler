@@ -72,4 +72,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 * We should look more a head for the second charge of discharge point, border should be 24 hours not date
 * Sometimes no discharge is added
 * Add PV to the calculation
-* 
+* Fix the header of webpage it is to large
