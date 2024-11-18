@@ -4,7 +4,7 @@ modules = ["python-3.11"]
 channel = "stable-24_05"
 
 [workflows]
-runButton = "Project"
+runButton = "streamlit"
 
 [[workflows.workflow]]
 name = "Project"
@@ -27,15 +27,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run main.py --server.address 0.0.0.0 --server.port 8080"
-waitForPort = 8080
+args = "streamlit run main.py --server.address 0.0.0.0 --server.port 5000 --server.headless true"
+waitForPort = 5000
 
 [deployment]
-run = ["sh", "-c", "streamlit run main.py --server.address 0.0.0.0 --server.port 8080"]
-
-[[ports]]
-localPort = 80
-externalPort = 3000
+run = ["sh", "-c", "streamlit run main.py --server.address 0.0.0.0 --server.port 5000 --server.headless true"]
 
 [[ports]]
 localPort = 5000

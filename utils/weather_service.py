@@ -13,7 +13,6 @@ from pathlib import Path
 import time
 import streamlit as st
 import pandas as pd
-from scipy.interpolate import CubicSpline
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +38,7 @@ class WeatherService:
         self._load_cached_location()
 
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float, lat: float, lon: float) -> Dict[datetime, float]:
-        """Calculate expected solar production based on weather data with smooth transitions"""
+        """Calculate expected solar production based on weather data"""
         if not isinstance(weather_data, dict) or 'list' not in weather_data:
             logger.error("Invalid weather data format")
             return {}
@@ -56,44 +55,36 @@ class WeatherService:
         location = Location(latitude=lat, longitude=lon, tz=tz_name, altitude=10)
         production = {}
 
-        # Process each forecast period
         for forecast in weather_data['list']:
             try:
                 timestamp = datetime.fromtimestamp(forecast['dt']).replace(tzinfo=pytz.UTC)
                 local_timestamp = timestamp.astimezone(timezone)
 
-                # Get sunrise/sunset times for the day
-                date = local_timestamp.date()
-                day_times = pd.date_range(start=f"{date} 00:00:00", end=f"{date} 23:59:59", freq="H", tz=location.tz)
-                sun_times = location.get_sun_rise_set_transit(day_times[0])
-                sunrise = sun_times['sunrise'].iloc[0]
-                sunset = sun_times['sunset'].iloc[0]
+                # Create times DataFrame
+                times = pd.date_range(start=local_timestamp, periods=1, freq='h')
 
-                # Skip if outside daylight hours
-                if local_timestamp.hour < sunrise.hour or local_timestamp.hour > sunset.hour:
+                # Calculate solar position
+                solar_position = location.get_solarposition(times)
+                apparent_elevation = float(solar_position['apparent_elevation'].iloc[0])
+
+                # Check if sun is below horizon
+                if apparent_elevation <= 0:
                     production[timestamp] = 0.0
                     continue
 
-                # Calculate relative position in daylight hours
-                day_progress = (local_timestamp - sunrise).total_seconds() / (sunset - sunrise).total_seconds()
-                
-                # Create smooth production curve base using sine function
-                base_production_factor = np.sin(day_progress * np.pi)
+                # Calculate extra terrestrial DNI
+                dni_extra = float(pvlib.irradiance.get_extra_radiation(times.dayofyear[0]))
 
-                # Calculate solar position
-                solar_position = location.get_solarposition(pd.DatetimeIndex([local_timestamp]))
-                apparent_elevation = float(solar_position['apparent_elevation'].iloc[0])
-
-                # Calculate clear sky radiation
-                clearsky = location.get_clearsky(pd.DatetimeIndex([local_timestamp]), model='ineichen')
-                
                 # Get cloud cover and calculate clearness index
                 clouds = min(max(0, forecast.get('clouds', {}).get('all', 100)), 100) / 100.0
                 day_of_year = local_timestamp.timetuple().tm_yday
                 seasonal_factor = 1.0 + 0.03 * np.sin(2 * np.pi * (day_of_year - 81) / 365)
                 clearness_index = max(0.1, (1.0 - (clouds * 0.75)) * seasonal_factor)
 
-                # Calculate radiation components
+                # Calculate clear sky radiation
+                clearsky = location.get_clearsky(times, model='ineichen')
+
+                # Calculate DNI and DHI with proper DataFrame handling
                 dni = float(clearsky['dni'].iloc[0]) * clearness_index
                 ghi = float(clearsky['ghi'].iloc[0]) * clearness_index
                 dhi = float(clearsky['dhi'].iloc[0]) * clearness_index
@@ -112,33 +103,37 @@ class WeatherService:
                 }
                 weather_factor = condition_factors.get(weather_condition, 0.7)
 
-                # Calculate total irradiance
+                # Calculate total irradiance with proper DataFrame handling
                 surface_tilt = 30  # Typical tilt for Netherlands
                 surface_azimuth = 180  # South-facing
-                
+
+                solar_zenith = float(solar_position['apparent_zenith'].iloc[0])
+                solar_azimuth = float(solar_position['azimuth'].iloc[0])
+
                 total_irrad = pvlib.irradiance.get_total_irradiance(
                     surface_tilt=surface_tilt,
                     surface_azimuth=surface_azimuth,
                     dni=dni,
                     ghi=ghi,
                     dhi=dhi,
-                    solar_zenith=float(solar_position['apparent_zenith'].iloc[0]),
-                    solar_azimuth=float(solar_position['azimuth'].iloc[0]),
-                    dni_extra=pvlib.irradiance.get_extra_radiation(local_timestamp.dayofyear),
+                    solar_zenith=solar_zenith,
+                    solar_azimuth=solar_azimuth,
+                    dni_extra=dni_extra,
                     model='haydavies'
                 )
 
-                # Calculate temperature effects
+                # Calculate cell temperature
                 wind_speed = float(forecast.get('wind', {}).get('speed', 1.0))
                 temp_air = float(forecast.get('main', {}).get('temp', 25.0))
-                
+
+                # Calculate cell temperature using pvsyst model with proper float handling
                 poa_global = float(total_irrad['poa_global'])
                 temp_cell = float(pvlib.temperature.pvsyst_cell(
                     poa_global=poa_global,
                     temp_air=temp_air,
                     wind_speed=wind_speed,
-                    u_c=29.0,
-                    u_v=0
+                    u_c=29.0,  # Heat transfer coefficient
+                    u_v=0  # Wind speed coefficient
                 ))
 
                 # Calculate efficiency factors
@@ -150,11 +145,10 @@ class WeatherService:
                 wiring_factor = 0.98
                 inverter_efficiency = 0.96
 
-                # Calculate final power output with smooth curve integration
+                # Calculate final power output
                 dc_power = (
                     poa_global 
-                    * max_watt_peak / 1000.0  # Convert to kW
-                    * base_production_factor  # Apply smooth curve
+                    * max_watt_peak / 1000.0
                     * system_efficiency
                     * temp_factor
                     * weather_factor
@@ -164,7 +158,7 @@ class WeatherService:
                     * inverter_efficiency
                 )
 
-                production[timestamp] = max(0.0, dc_power)
+                production[timestamp] = max(0, dc_power)
                 logger.info(f"Calculated production for {local_timestamp}: {dc_power:.2f} kW "
                           f"(clearness: {clearness_index:.2f}, weather: {weather_condition})")
 
@@ -175,45 +169,35 @@ class WeatherService:
         return production
 
     def get_pv_forecast(self, max_watt_peak: float) -> float:
-        """Get PV production forecast with improved daily curve"""
+        """Get PV production forecast for current hour"""
         try:
             if not isinstance(max_watt_peak, (int, float)) or max_watt_peak <= 0:
                 return 0.0
 
-            lat, lon = self.get_location_from_ip()
             current_hour = datetime.now(pytz.UTC).replace(minute=0, second=0, microsecond=0)
+            lat, lon = self.get_location_from_ip()
             
-            # Get location object for solar calculations
-            location = Location(latitude=lat, longitude=lon, tz=self._get_timezone(lat, lon))
+            # Get weather data
+            weather_data = self.get_weather_data(lat, lon)
+            if not weather_data:
+                return 0.0
+
+            # Calculate production for all hours
+            pv_forecast = self.calculate_solar_production(weather_data, max_watt_peak, lat, lon)
             
-            # Calculate sun position for the day
-            date = current_hour.date()
-            times = pd.date_range(start=f"{date} 00:00:00", end=f"{date} 23:59:59", freq="H", tz=location.tz)
-            solar_position = location.get_solarposition(times)
-            
-            # Get sunrise/sunset times
-            sun_times = location.get_sun_rise_set_transit(times[0])
-            sunrise = sun_times['sunrise'].iloc[0]
-            sunset = sun_times['sunset'].iloc[0]
-            
-            # Generate smooth production curve
-            production = 0.0
-            if sunrise <= current_hour <= sunset:
-                # Calculate relative position in daylight hours
-                day_progress = (current_hour - sunrise).total_seconds() / (sunset - sunrise).total_seconds()
+            # Find the closest forecast time
+            if not pv_forecast:
+                return 0.0
                 
-                # Create bell curve peaking at solar noon
-                production_factor = np.sin(day_progress * np.pi)
-                
-                # Get weather data and apply factors
-                weather_data = self.get_weather_data(lat, lon)
-                if weather_data:
-                    clouds = min(max(0, weather_data['list'][0].get('clouds', {}).get('all', 100)), 100) / 100.0
-                    clearness = 1.0 - (clouds * 0.75)
-                    production = max_watt_peak * production_factor * clearness / 1000.0  # Convert to kW
+            closest_time = min(pv_forecast.keys(), key=lambda x: abs(x - current_hour))
+            time_diff = abs((closest_time - current_hour).total_seconds())
             
-            return max(0.0, production)
+            if time_diff <= 3600:  # Within 1 hour
+                return pv_forecast[closest_time]
             
+            logger.warning(f"No production data available for current hour: {current_hour}")
+            return 0.0
+
         except Exception as e:
             logger.error(f"Error in PV forecast: {str(e)}")
             return 0.0
