@@ -13,7 +13,6 @@ from pathlib import Path
 import time
 import streamlit as st
 import pandas as pd
-from scipy.interpolate import interp1d
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,15 +106,19 @@ class WeatherService:
                 local_timestamp = timestamp.astimezone(timezone)
 
                 # Create solar position calculation times
-                times = pd.DatetimeIndex([local_timestamp])
+                times = pd.date_range(start=local_timestamp, periods=1, freq='h')
                 
                 # Calculate solar position
-                solar_position = location.get_solarposition(times=times)
+                solar_position = location.get_solarposition(times)
 
                 # Check if sun is below horizon
-                if solar_position['apparent_elevation'].iloc[0] <= 0:
+                apparent_elevation = float(solar_position['apparent_elevation'].iloc[0])
+                if apparent_elevation <= 0:
                     production[timestamp] = 0.0
                     continue
+
+                # Calculate extra terrestrial DNI
+                dni_extra = pvlib.irradiance.get_extra_radiation(times.dayofyear)
 
                 # Get cloud cover
                 clouds = min(max(0, forecast.get('clouds', {}).get('all', 100)), 100) / 100.0
@@ -156,8 +159,9 @@ class WeatherService:
                     dni=dni,
                     ghi=ghi,
                     dhi=dhi,
-                    solar_zenith=solar_position['apparent_zenith'].iloc[0],
-                    solar_azimuth=solar_position['azimuth'].iloc[0],
+                    solar_zenith=float(solar_position['apparent_zenith'].iloc[0]),
+                    solar_azimuth=float(solar_position['azimuth'].iloc[0]),
+                    dni_extra=float(dni_extra.iloc[0]),
                     model='haydavies'
                 )
 
@@ -165,8 +169,9 @@ class WeatherService:
                 wind_speed = forecast.get('wind', {}).get('speed', 1.0)
                 temp_air = forecast.get('main', {}).get('temp', 25)
                 
+                poa_global = float(total_irrad['poa_global'])
                 temp_cell = pvlib.temperature.pvsyst_cell(
-                    poa_global=total_irrad['poa_global'],
+                    poa_global=poa_global,
                     temp_air=temp_air,
                     wind_speed=wind_speed,
                     u_c=29.0,  # Heat transfer coefficient
@@ -184,7 +189,7 @@ class WeatherService:
 
                 # Calculate final power output
                 dc_power = (
-                    total_irrad['poa_global'] * max_watt_peak / 1000.0
+                    poa_global * max_watt_peak / 1000.0
                     * system_efficiency
                     * temp_factor
                     * weather_factor

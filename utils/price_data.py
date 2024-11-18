@@ -21,14 +21,15 @@ def get_day_ahead_prices(forecast_hours=24):
         now = datetime.now()
         current_hour = now.replace(minute=0, second=0, microsecond=0)
         publication_time = now.replace(hour=13,
-                                       minute=0,
-                                       second=0,
-                                       microsecond=0)
+                                      minute=0,
+                                      second=0,
+                                      microsecond=0)
 
-        # Generate dates for the entire forecast period
+        # Generate dates for the entire forecast period using inclusive parameter
         dates = pd.date_range(start=current_hour,
-                              periods=forecast_hours,
-                              freq='h')
+                             periods=forecast_hours,
+                             freq='h',
+                             inclusive='both')
         prices = []
 
         for date in dates:
@@ -37,7 +38,7 @@ def get_day_ahead_prices(forecast_hours=24):
 
             # Dynamic base price adjusted for forecast horizon
             BASE_PRICE = 0.22 * (1 + (hours_ahead - 24) / 48 * 0.1
-                                 if hours_ahead > 24 else 1)
+                               if hours_ahead > 24 else 1)
 
             # Enhanced uncertainty model for extended forecasts
             uncertainty_factor = 0.05 + (hours_ahead / 48) * 0.1
@@ -46,12 +47,12 @@ def get_day_ahead_prices(forecast_hours=24):
             day_of_week = date.weekday()
             weekend_factor = np.sin(np.pi * day_of_week / 7) * 0.05
             weekly_factor = 1.0 + (weekend_factor
-                                   if day_of_week < 5 else -weekend_factor)
+                                  if day_of_week < 5 else -weekend_factor)
 
             # Enhanced daily seasonality with smoother transitions
             hourly_factor = hour / 24.0
             daily_factor = (np.sin(2 * np.pi * hourly_factor) * 0.1 +
-                            np.sin(4 * np.pi * hourly_factor) * 0.05)
+                           np.sin(4 * np.pi * hourly_factor) * 0.05)
 
             # Price calculation with hour-based factors
             if hour in [7, 8, 9, 17, 18, 19, 20]:
@@ -87,11 +88,12 @@ def get_day_ahead_prices(forecast_hours=24):
         print(f"Error generating price data: {str(e)}")
         # Ensure current_hour is defined in the exception handler
         current_hour = datetime.now().replace(minute=0,
-                                              second=0,
-                                              microsecond=0)
+                                             second=0,
+                                             microsecond=0)
         dates = pd.date_range(start=current_hour,
-                              periods=forecast_hours,
-                              freq='h')
+                             periods=forecast_hours,
+                             freq='h',
+                             inclusive='both')
         return pd.Series([0.22] * len(dates), index=dates)
 
 
