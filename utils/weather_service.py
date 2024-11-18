@@ -83,7 +83,7 @@ class WeatherService:
         return default_tz
 
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float, lat: float, lon: float) -> Dict[datetime, float]:
-        """Calculate expected solar production based on weather data with enhanced error handling"""
+        """Calculate expected solar production based on weather data with enhanced solar calculations"""
         if not isinstance(weather_data, dict) or 'list' not in weather_data:
             logger.error("Invalid weather data format")
             return {}
@@ -97,7 +97,7 @@ class WeatherService:
             timezone = pytz.UTC
 
         # Create location object for solar calculations
-        location = Location(latitude=lat, longitude=lon, tz=tz_name)
+        location = Location(latitude=lat, longitude=lon, tz=tz_name, altitude=10)
         production = {}
 
         for forecast in weather_data['list']:
@@ -112,12 +112,14 @@ class WeatherService:
                 # Create a pandas DatetimeIndex for solar calculations
                 times = pd.DatetimeIndex([local_timestamp])
 
-                # Get solar position
-                solar_position = location.get_solarposition(times)
-                zenith = float(solar_position['apparent_zenith'].iloc[0])
-                is_day = zenith < 90
+                # Calculate solar position
+                solar_position = location.get_solarposition(times=times, temperature=forecast.get('main', {}).get('temp', 25))
+                
+                # Calculate extra terrestrial DNI
+                dni_extra = pvlib.irradiance.get_extra_radiation(times)
 
-                if not is_day:
+                # Check if sun is below horizon
+                if solar_position['apparent_elevation'].iloc[0] <= 0:
                     production[timestamp] = 0.0
                     logger.debug(f"Night time at {local_timestamp}, production: 0.0 kW")
                     continue
@@ -128,17 +130,22 @@ class WeatherService:
                     clouds = 100
                 clouds = min(max(0, clouds), 100) / 100.0
 
-                # Calculate clearness index with improved formula
-                clearness_index = max(0.1, 1.0 - (clouds * 0.75))
+                # Calculate clearness index with seasonal adjustment
+                day_of_year = local_timestamp.timetuple().tm_yday
+                seasonal_factor = 1.0 + 0.03 * np.sin(2 * np.pi * (day_of_year - 81) / 365)
+                clearness_index = max(0.1, (1.0 - (clouds * 0.75)) * seasonal_factor)
 
-                # Get clear sky radiation
-                clearsky = location.get_clearsky(times)
+                # Get clear sky radiation with enhanced model
+                clearsky = location.get_clearsky(times, model='ineichen', dni_extra=dni_extra)
                 if clearsky.empty:
                     logger.warning(f"No clearsky data available for {local_timestamp}")
                     production[timestamp] = 0.0
                     continue
 
+                # Calculate DNI and DHI
+                dni = float(clearsky['dni'].iloc[0]) * clearness_index
                 ghi = float(clearsky['ghi'].iloc[0]) * clearness_index
+                dhi = float(clearsky['dhi'].iloc[0]) * clearness_index
 
                 # Apply weather conditions with detailed factors
                 weather_condition = forecast.get('weather', [{}])[0].get('main', '').lower()
@@ -153,50 +160,56 @@ class WeatherService:
                     'thunderstorm': 0.2
                 }
                 weather_factor = condition_factors.get(weather_condition, 0.7)
-                ghi *= weather_factor
 
-                # Calculate irradiance components
-                disc_output = pvlib.irradiance.disc(
-                    ghi=ghi,
-                    solar_zenith=zenith,
-                    datetime_or_doy=times
-                )
-
-                dni = float(disc_output['dni'].iloc[0])
-                dhi = ghi - (dni * np.cos(np.radians(zenith)))
-
-                # Calculate total irradiance on tilted surface
+                # Calculate total irradiance on tilted surface with enhanced model
+                surface_tilt = 30  # Typical tilt for Netherlands
+                surface_azimuth = 180  # South-facing
                 total_irrad = pvlib.irradiance.get_total_irradiance(
-                    surface_tilt=30,  # Assuming 30-degree tilt for panels
-                    surface_azimuth=180,  # Assuming south-facing
+                    surface_tilt=surface_tilt,
+                    surface_azimuth=surface_azimuth,
                     dni=dni,
                     ghi=ghi,
                     dhi=dhi,
-                    solar_zenith=zenith,
-                    solar_azimuth=float(solar_position['azimuth'].iloc[0])
+                    solar_zenith=solar_position['apparent_zenith'].iloc[0],
+                    solar_azimuth=solar_position['azimuth'].iloc[0],
+                    dni_extra=dni_extra.iloc[0],
+                    model='haydavies'
                 )
 
-                # Apply system efficiency and temperature derating
-                system_efficiency = 0.75  # Standard system efficiency
-                temperature_coefficient = -0.0040  # Temperature coefficient for power
+                # Calculate cell temperature using Sandia model
+                wind_speed = forecast.get('wind', {}).get('speed', 1.0)
+                temp_cell = pvlib.temperature.sapm_cell(
+                    poa_global=total_irrad['poa_global'],
+                    temp_air=forecast.get('main', {}).get('temp', 25),
+                    wind_speed=wind_speed,
+                    a=-3.56,  # SAPM temperature model coefficient
+                    b=-0.075  # SAPM temperature model coefficient
+                )
 
-                # Get temperature with validation
-                ambient_temp = forecast.get('main', {}).get('temp')
-                if not isinstance(ambient_temp, (int, float)):
-                    ambient_temp = 25  # Default temperature if missing
+                # Calculate temperature-adjusted efficiency
+                temp_coefficient = -0.0040  # Standard temperature coefficient for power
+                temp_factor = 1 + temp_coefficient * (float(temp_cell) - 25)
 
-                # Calculate cell temperature
-                cell_temperature = ambient_temp + (total_irrad['poa_global'] / 800.0) * 30
-                temperature_factor = 1 + temperature_coefficient * (cell_temperature - 25)
+                # Calculate final power output with enhanced efficiency model
+                system_efficiency = 0.75  # Base system efficiency
+                soiling_factor = 0.98  # Account for panel soiling
+                mismatch_factor = 0.98  # Account for panel mismatch
+                wiring_factor = 0.98  # Account for wiring losses
+                inverter_efficiency = 0.96  # Typical inverter efficiency
 
-                # Calculate final power output
                 dc_power = (
                     total_irrad['poa_global'] * max_watt_peak / 1000.0  # Convert to kW
-                    * system_efficiency * temperature_factor * weather_factor
+                    * system_efficiency
+                    * temp_factor
+                    * weather_factor
+                    * soiling_factor
+                    * mismatch_factor
+                    * wiring_factor
+                    * inverter_efficiency
                 )
 
-                production[timestamp] = max(0, dc_power)
-                logger.info(f"Calculated production for {local_timestamp}: {dc_power:.2f} kW "
+                production[timestamp] = max(0, float(dc_power))
+                logger.info(f"Calculated production for {local_timestamp}: {float(dc_power):.2f} kW "
                           f"(clearness: {clearness_index:.2f}, weather: {weather_condition})")
 
             except Exception as e:
@@ -328,6 +341,12 @@ class WeatherService:
             logger.error(f"Error in get_weather_data: {str(e)}")
             return None
 
+    def get_location_from_ip(self) -> Tuple[float, float]:
+        """Get location with Netherlands as default"""
+        logger.info(f"Using default location (Netherlands): {self._default_location}")
+        self._save_cached_location(self._default_location)
+        return self._default_location
+
     def _load_cached_location(self):
         """Load cached location from file"""
         try:
@@ -355,9 +374,3 @@ class WeatherService:
             logger.info(f"Saved location to cache: {location}")
         except Exception as e:
             logger.warning(f"Failed to save location to cache: {str(e)}")
-
-    def get_location_from_ip(self) -> Tuple[float, float]:
-        """Get location with Netherlands as default"""
-        logger.info(f"Using default location (Netherlands): {self._default_location}")
-        self._save_cached_location(self._default_location)
-        return self._default_location

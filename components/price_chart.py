@@ -169,8 +169,10 @@ def render_price_chart(prices,
                     x=prices.index,
                     y=pv_production,
                     name="Solar Production",
-                    line=dict(color="rgba(255, 215, 0, 0.9)", width=2),
+                    line=dict(color="rgba(241, 196, 15, 1.0)", width=3),
                     mode='lines',
+                    fill='tozeroy',
+                    fillcolor='rgba(241, 196, 15, 0.2)',
                     hovertemplate="Time: %{x}<br>PV Production: %{y:.2f} kW<extra></extra>"
                 )
             )
