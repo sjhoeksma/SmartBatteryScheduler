@@ -37,11 +37,11 @@ def calculate_price_thresholds(_effective_prices, _date):
     # Calculate rolling statistics with adaptive window for extended timelines
     window_size = min(36, len(daily_prices))
     rolling_mean = daily_prices.rolling(window=window_size,
-                                        min_periods=1,
-                                        center=True).mean()
+                                      min_periods=1,
+                                      center=True).mean()
     rolling_std = daily_prices.rolling(window=window_size,
-                                       min_periods=1,
-                                       center=True).std()
+                                     min_periods=1,
+                                     center=True).std()
 
     # Calculate dynamic thresholds with updated factors for better statistical significance
     charge_threshold = rolling_mean - 0.7 * rolling_std  # Changed from 0.5 to 0.7
@@ -56,21 +56,29 @@ def calculate_price_thresholds(_effective_prices, _date):
 
 def optimize_schedule(_prices, _battery):
     """
-    Optimize charging schedule based on prices and battery constraints
+    Optimize charging schedule based on prices, battery constraints, and PV production
     Returns charging power for each time period and predicted SOC values
     with immediate changes for charging/discharging
     
     Strategy:
     1. Calculate effective prices considering confidence weighting
     2. Use rolling window analysis for price thresholds
-    3. Compare future prices with less restrictive thresholds
-    4. Maintain cycle and event limits while maximizing profitability
-    5. Apply immediate SOC changes for charging/discharging events
+    3. Include PV production in optimization
+    4. Compare future prices with less restrictive thresholds
+    5. Maintain cycle and event limits while maximizing profitability
+    6. Apply immediate SOC changes for charging/discharging events
     """
     periods = len(_prices)
     schedule = np.zeros(periods)
     predicted_soc = np.zeros(periods * 4)  # Removed the +1 to fix alignment
     consumption_stats = analyze_consumption_patterns(_battery, _prices.index)
+    weather_service = st.session_state.weather_service
+
+    # Get PV production forecast for optimization period
+    pv_forecast = {}
+    if _battery.max_watt_peak > 0:
+        for date in _prices.index:
+            pv_forecast[date] = weather_service.get_pv_forecast(_battery.max_watt_peak)
 
     # Calculate effective prices with reduced confidence weighting impact
     effective_prices = pd.Series([
@@ -78,7 +86,7 @@ def optimize_schedule(_prices, _battery):
         (0.9 + 0.1 * get_price_forecast_confidence(date))
         for price, date in zip(_prices.values, _prices.index)
     ],
-                                 index=_prices.index)
+                               index=_prices.index)
 
     # Pre-calculate daily thresholds with extended timeline support
     daily_thresholds = {}
@@ -99,6 +107,7 @@ def optimize_schedule(_prices, _battery):
         current_date = current_datetime.date()
         current_hour = current_datetime.hour
         current_price = effective_prices.iloc[i]
+        current_pv = pv_forecast.get(current_datetime, 0.0)
 
         # Initialize daily tracking if needed
         if current_date not in daily_events:
@@ -131,43 +140,60 @@ def optimize_schedule(_prices, _battery):
 
         # Optimize charging/discharging decision with bounds checking
         available_capacity = _battery.capacity * (_battery.max_soc -
-                                                  current_soc)
+                                                current_soc)
         available_discharge = _battery.capacity * (current_soc -
-                                                   _battery.min_soc)
+                                                 _battery.min_soc)
 
         # Calculate home consumption for this hour
         current_hour_consumption = _battery.get_hourly_consumption(
             current_hour, current_datetime)
 
-        if remaining_cycles > 0:
-            # Charging decision with relative threshold
-            relative_charge_threshold = thresholds['rolling_mean'] * 0.98
-            if (is_valley and current_price <= relative_charge_threshold
-                    and future_min_price != future_max_price
-                    and available_capacity > 0):
-                max_allowed_charge = min(
-                    available_capacity,  # Remove hardcoded value
-                    _battery.charge_rate,  # Use battery's actual charge rate
-                    remaining_cycles * _battery.capacity)
+        # Include PV production in decision making
+        net_consumption = max(0, current_hour_consumption - current_pv)
+        excess_pv = max(0, current_pv - current_hour_consumption)
 
-                # If we cannot load the full charge any more look if there is a better option within the same
-                if max_allowed_charge > 0:
-                    schedule[i] = max_allowed_charge
-                    daily_events[current_date][
-                        'cycles'] += max_allowed_charge / _battery.capacity
+        if remaining_cycles > 0:
+            # Prioritize storing excess PV production
+            if excess_pv > 0 and available_capacity > 0:
+                max_pv_charge = min(
+                    excess_pv,
+                    _battery.charge_rate,
+                    available_capacity,
+                    remaining_cycles * _battery.capacity
+                )
+                if max_pv_charge > 0:
+                    schedule[i] = max_pv_charge
+                    daily_events[current_date]['cycles'] += max_pv_charge / _battery.capacity
+                    available_capacity -= max_pv_charge
+
+            # Regular price-based optimization
+            if available_capacity > 0:  # Still have capacity after PV charging
+                relative_charge_threshold = thresholds['rolling_mean'] * 0.98
+                if (is_valley and current_price <= relative_charge_threshold
+                        and future_min_price != future_max_price
+                        and available_capacity > 0):
+                    max_allowed_charge = min(
+                        available_capacity,
+                        _battery.charge_rate - max(0, schedule[i]),  # Consider existing PV charging
+                        remaining_cycles * _battery.capacity)
+
+                    if max_allowed_charge > 0:
+                        schedule[i] += max_allowed_charge
+                        daily_events[current_date][
+                            'cycles'] += max_allowed_charge / _battery.capacity
 
             # Add peak price preservation check with more sensitive threshold
             elif not is_peak and future_prices.max(
             ) > current_price * 1.05:  # Changed from 1.1 to 1.05
-                pass  # Skip discharge, better prices coming, but calcuated SOC
+                pass  # Skip discharge, better prices coming, but calculated SOC
 
             # Discharging decision with peak detection and relative threshold
             elif (is_peak and future_max_price != 0
                   and current_price >= future_max_price * 0.98
-                  and available_discharge - current_hour_consumption > 0):
+                  and available_discharge - net_consumption > 0):
                 max_allowed_discharge = min(
                     _battery.charge_rate,
-                    available_discharge - current_hour_consumption,
+                    available_discharge - net_consumption,
                     remaining_cycles * _battery.capacity)
                 if max_allowed_discharge > 0:
                     schedule[i] = -max_allowed_discharge
@@ -176,13 +202,13 @@ def optimize_schedule(_prices, _battery):
 
         # Calculate SOC change for current hour with proper scaling
         try:
-
-            # Calculate SOC impacts for this hour
-            consumption_soc_impact = current_hour_consumption / _battery.capacity  # Hourly consumption impact
-            soc_impact = (schedule[i] / _battery.capacity)  # soc impact
+            # Calculate SOC impacts for this hour including PV
+            consumption_soc_impact = net_consumption / _battery.capacity  # Net consumption impact after PV
+            charge_soc_impact = schedule[i] / _battery.capacity  # Charging/discharging impact
+            pv_soc_impact = min(excess_pv, available_capacity) / _battery.capacity  # Direct PV charging impact
 
             # Calculate net SOC change for this hour
-            net_soc_change = soc_impact - consumption_soc_impact
+            net_soc_change = charge_soc_impact + pv_soc_impact - consumption_soc_impact
 
             # Update SOC for each 15-minute interval in this hour
             for j in range(4):
@@ -198,7 +224,7 @@ def optimize_schedule(_prices, _battery):
             # Update current SOC for next hour
             current_soc = current_soc + net_soc_change
             current_soc = np.clip(current_soc, _battery.empty_soc,
-                                  _battery.max_soc)
+                               _battery.max_soc)
 
         except (IndexError, KeyError, ValueError) as e:
             # If there's an error, maintain current SOC
@@ -210,8 +236,6 @@ def optimize_schedule(_prices, _battery):
 
         # Ensure SOC stays within limits
         current_soc = np.clip(current_soc, _battery.empty_soc,
-                              _battery.max_soc)
-    #print("Consumption for {} {} {}".format(schedule,predicted_soc,
-    #                                        consumption_stats))
+                           _battery.max_soc)
 
     return schedule, predicted_soc, consumption_stats

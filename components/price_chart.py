@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from utils.price_data import is_prices_available_for_tomorrow, get_price_forecast_confidence
+from utils.weather_service import WeatherService
 
 
 # Cache the base figure layout
@@ -93,13 +94,13 @@ def get_price_colors(_dates, _prices):
         # Updated opacity settings for better visualization
         if hour in [7, 8, 9, 17, 18, 19, 20]:
             opacity = max(0.15,
-                          confidence * 0.4)  # Peak hours (more transparent)
+                         confidence * 0.4)  # Peak hours (more transparent)
         elif hour in [10, 11, 12, 13, 14, 15, 16]:
             opacity = max(0.1, confidence *
-                          0.3)  # Shoulder hours (more transparent)
+                         0.3)  # Shoulder hours (more transparent)
         else:
             opacity = max(0.08, confidence *
-                          0.25)  # Off-peak hours (more transparent)
+                         0.25)  # Off-peak hours (more transparent)
 
         colors.append(base_color.format(opacity=opacity))
 
@@ -107,9 +108,9 @@ def get_price_colors(_dates, _prices):
 
 
 def render_price_chart(prices,
-                       schedule=None,
-                       predicted_soc=None,
-                       consumption_stats=None):
+                      schedule=None,
+                      predicted_soc=None,
+                      consumption_stats=None):
     """Render interactive price chart with charging schedule and SOC prediction"""
     try:
         # Add data availability notice
@@ -155,6 +156,25 @@ def render_price_chart(prices,
                     "Time: %{x}<br>Price: €%{y:.3f}/kWh<br>Confidence: %{marker.opacity:.0%}<extra></extra>",
                     showlegend=(i == 0)))
 
+        # Add PV production forecast if battery has PV configured
+        if 'battery' in st.session_state and st.session_state.battery.max_watt_peak > 0:
+            weather_service = WeatherService()
+            pv_production = []
+            for date in prices.index:
+                forecast = weather_service.get_pv_forecast(st.session_state.battery.max_watt_peak)
+                pv_production.append(forecast)
+
+            fig.add_trace(
+                go.Scatter(
+                    x=prices.index,
+                    y=pv_production,
+                    name="Solar Production",
+                    line=dict(color="rgba(255, 215, 0, 0.9)", width=2),
+                    mode='lines',
+                    hovertemplate="Time: %{x}<br>PV Production: %{y:.2f} kW<extra></extra>"
+                )
+            )
+
         # Add home usage line if battery is in session state
         if 'battery' in st.session_state:
             battery = st.session_state.battery
@@ -165,12 +185,12 @@ def render_price_chart(prices,
 
             fig.add_trace(
                 go.Scatter(x=prices.index,
-                           y=home_usage,
-                           name="Home Usage",
-                           line=dict(color="rgba(52, 73, 94, 0.9)", width=2),
-                           mode='lines',
-                           hovertemplate=
-                           "Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"))
+                          y=home_usage,
+                          name="Home Usage",
+                          line=dict(color="rgba(52, 73, 94, 0.9)", width=2),
+                          mode='lines',
+                          hovertemplate=
+                          "Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"))
 
         # Add charging/discharging visualization with increased opacity
         if schedule is not None and isinstance(
@@ -201,14 +221,12 @@ def render_price_chart(prices,
                         marker_color="rgba(255, 0, 0, 0.98)",
                         width=3600000,
                         hovertemplate=
-                        "Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
-                    ))
+                        "Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"))
 
         # Add SOC prediction with proper point visualization
         if predicted_soc is not None and isinstance(
                 predicted_soc,
-            (list, np.ndarray
-             )) and len(predicted_soc) > 0 and 'battery' in st.session_state:
+                (list, np.ndarray)) and len(predicted_soc) > 0 and 'battery' in st.session_state:
             # Create full timeline of points
             timestamps = []
             soc_values = []
@@ -224,7 +242,7 @@ def render_price_chart(prices,
                     point_index = i * points_per_hour + j
                     if point_index < len(soc_array):
                         timestamps.append(prices.index[i] +
-                                          timedelta(minutes=15 * j))
+                                       timedelta(minutes=15 * j))
                         # Convert SOC from decimal to percentage (0-100 range)
                         soc_values.append(float(soc_array[point_index] * 100))
 
@@ -232,21 +250,21 @@ def render_price_chart(prices,
             if timestamps and soc_values:
                 fig.add_trace(
                     go.Scatter(x=timestamps,
-                               y=soc_values,
-                               name="Predicted SOC",
-                               line=dict(color="rgba(155, 89, 182, 0.9)",
-                                         width=3,
-                                         shape='spline',
-                                         smoothing=0.3),
-                               mode='lines',
-                               yaxis="y3",
-                               hovertemplate=
-                               "Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"))
+                              y=soc_values,
+                              name="Predicted SOC",
+                              line=dict(color="rgba(155, 89, 182, 0.9)",
+                                       width=3,
+                                       shape='spline',
+                                       smoothing=0.3),
+                              mode='lines',
+                              yaxis="y3",
+                              hovertemplate=
+                              "Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"))
 
         # Add unique key to plotly chart to fix StreamlitDuplicateElementId error
         st.plotly_chart(fig,
-                        use_container_width=True,
-                        key=f"price_chart_{datetime.now().timestamp()}")
+                       use_container_width=True,
+                       key=f"price_chart_{datetime.now().timestamp()}")
 
         # Add cached legends with dynamic price thresholds
         if len(prices) > 0:
@@ -262,6 +280,7 @@ def render_price_chart(prices,
         st.info("""
         📈 **Usage Pattern Information**
         - The black line shows actual home usage including hourly variations
+        - The yellow line shows predicted solar production
         - Light blue bars indicate charging periods (buying energy)
         - Dark blue bars indicate discharging periods (using stored energy)
         - Energy prices are shown as hourly blocks with opacity indicating forecast confidence
