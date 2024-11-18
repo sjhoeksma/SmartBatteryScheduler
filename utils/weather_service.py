@@ -37,51 +37,6 @@ class WeatherService:
         self._default_location = (52.3025, 4.6889)  # Netherlands coordinates
         self._load_cached_location()
 
-    def _cleanup_cache(self):
-        """Remove expired entries from weather cache"""
-        current_time = datetime.now(pytz.UTC)
-        expired_keys = [
-            key for key, last_time in self._last_cache_time.items()
-            if current_time - last_time > self._cache_ttl
-        ]
-        for key in expired_keys:
-            self._weather_cache.pop(key, None)
-            self._last_cache_time.pop(key, None)
-
-    def _exponential_backoff(self, retry: int) -> float:
-        """Calculate exponential backoff delay"""
-        return min(300, self._base_delay * (2**retry))
-
-    def _wait_for_rate_limit(self, retry: int = 0):
-        """Implement rate limiting with exponential backoff"""
-        current_time = time.time()
-        delay = self._exponential_backoff(retry)
-        time_since_last_call = current_time - self._last_api_call
-        if time_since_last_call < delay:
-            time.sleep(delay - time_since_last_call)
-        self._last_api_call = time.time()
-
-    def _get_timezone(self, lat: float, lon: float) -> str:
-        """Get timezone string for given coordinates"""
-        cache_key = f"{lat},{lon}"
-        if cache_key in self._timezone_cache:
-            return self._timezone_cache[cache_key]
-
-        try:
-            import timezonefinder
-            tf = timezonefinder.TimezoneFinder()
-            timezone_str = tf.timezone_at(lat=lat, lng=lon)
-            if timezone_str:
-                self._timezone_cache[cache_key] = timezone_str
-                return timezone_str
-        except Exception as e:
-            logger.warning(f"TimezoneFinder failed: {str(e)}")
-
-        # Default to Europe/Amsterdam for Netherlands
-        default_tz = 'Europe/Amsterdam'
-        self._timezone_cache[cache_key] = default_tz
-        return default_tz
-
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float, lat: float, lon: float) -> Dict[datetime, float]:
         """Calculate expected solar production based on weather data"""
         if not isinstance(weather_data, dict) or 'list' not in weather_data:
@@ -105,33 +60,31 @@ class WeatherService:
                 timestamp = datetime.fromtimestamp(forecast['dt']).replace(tzinfo=pytz.UTC)
                 local_timestamp = timestamp.astimezone(timezone)
 
-                # Create solar position calculation times
+                # Create times DataFrame
                 times = pd.date_range(start=local_timestamp, periods=1, freq='h')
-                
+
                 # Calculate solar position
                 solar_position = location.get_solarposition(times)
+                apparent_elevation = float(solar_position['apparent_elevation'].iloc[0])
 
                 # Check if sun is below horizon
-                apparent_elevation = float(solar_position['apparent_elevation'].iloc[0])
                 if apparent_elevation <= 0:
                     production[timestamp] = 0.0
                     continue
 
                 # Calculate extra terrestrial DNI
-                dni_extra = pvlib.irradiance.get_extra_radiation(times.dayofyear)
+                dni_extra = float(pvlib.irradiance.get_extra_radiation(times.dayofyear[0]))
 
-                # Get cloud cover
+                # Get cloud cover and calculate clearness index
                 clouds = min(max(0, forecast.get('clouds', {}).get('all', 100)), 100) / 100.0
-
-                # Calculate clearness index with seasonal adjustment
                 day_of_year = local_timestamp.timetuple().tm_yday
                 seasonal_factor = 1.0 + 0.03 * np.sin(2 * np.pi * (day_of_year - 81) / 365)
                 clearness_index = max(0.1, (1.0 - (clouds * 0.75)) * seasonal_factor)
 
                 # Calculate clear sky radiation
                 clearsky = location.get_clearsky(times, model='ineichen')
-                
-                # Calculate DNI and DHI
+
+                # Calculate DNI and DHI with proper DataFrame handling
                 dni = float(clearsky['dni'].iloc[0]) * clearness_index
                 ghi = float(clearsky['ghi'].iloc[0]) * clearness_index
                 dhi = float(clearsky['dhi'].iloc[0]) * clearness_index
@@ -150,33 +103,38 @@ class WeatherService:
                 }
                 weather_factor = condition_factors.get(weather_condition, 0.7)
 
-                # Calculate total irradiance
+                # Calculate total irradiance with proper DataFrame handling
                 surface_tilt = 30  # Typical tilt for Netherlands
                 surface_azimuth = 180  # South-facing
+
+                solar_zenith = float(solar_position['apparent_zenith'].iloc[0])
+                solar_azimuth = float(solar_position['azimuth'].iloc[0])
+
                 total_irrad = pvlib.irradiance.get_total_irradiance(
                     surface_tilt=surface_tilt,
                     surface_azimuth=surface_azimuth,
                     dni=dni,
                     ghi=ghi,
                     dhi=dhi,
-                    solar_zenith=float(solar_position['apparent_zenith'].iloc[0]),
-                    solar_azimuth=float(solar_position['azimuth'].iloc[0]),
-                    dni_extra=float(dni_extra.iloc[0]),
+                    solar_zenith=solar_zenith,
+                    solar_azimuth=solar_azimuth,
+                    dni_extra=dni_extra,
                     model='haydavies'
                 )
 
-                # Calculate cell temperature using pvsyst model
-                wind_speed = forecast.get('wind', {}).get('speed', 1.0)
-                temp_air = forecast.get('main', {}).get('temp', 25)
-                
+                # Calculate cell temperature
+                wind_speed = float(forecast.get('wind', {}).get('speed', 1.0))
+                temp_air = float(forecast.get('main', {}).get('temp', 25.0))
+
+                # Calculate cell temperature using pvsyst model with proper float handling
                 poa_global = float(total_irrad['poa_global'])
-                temp_cell = pvlib.temperature.pvsyst_cell(
+                temp_cell = float(pvlib.temperature.pvsyst_cell(
                     poa_global=poa_global,
                     temp_air=temp_air,
                     wind_speed=wind_speed,
                     u_c=29.0,  # Heat transfer coefficient
                     u_v=0  # Wind speed coefficient
-                )
+                ))
 
                 # Calculate efficiency factors
                 temp_coefficient = -0.0040
@@ -189,7 +147,8 @@ class WeatherService:
 
                 # Calculate final power output
                 dc_power = (
-                    poa_global * max_watt_peak / 1000.0
+                    poa_global 
+                    * max_watt_peak / 1000.0
                     * system_efficiency
                     * temp_factor
                     * weather_factor
@@ -199,8 +158,8 @@ class WeatherService:
                     * inverter_efficiency
                 )
 
-                production[timestamp] = max(0, float(dc_power))
-                logger.info(f"Calculated production for {local_timestamp}: {float(dc_power):.2f} kW "
+                production[timestamp] = max(0, dc_power)
+                logger.info(f"Calculated production for {local_timestamp}: {dc_power:.2f} kW "
                           f"(clearness: {clearness_index:.2f}, weather: {weather_condition})")
 
             except Exception as e:
@@ -299,6 +258,27 @@ class WeatherService:
         logger.info(f"Using default location (Netherlands): {self._default_location}")
         return self._default_location
 
+    def _get_timezone(self, lat: float, lon: float) -> str:
+        """Get timezone string for given coordinates"""
+        cache_key = f"{lat},{lon}"
+        if cache_key in self._timezone_cache:
+            return self._timezone_cache[cache_key]
+
+        try:
+            import timezonefinder
+            tf = timezonefinder.TimezoneFinder()
+            timezone_str = tf.timezone_at(lat=lat, lng=lon)
+            if timezone_str:
+                self._timezone_cache[cache_key] = timezone_str
+                return timezone_str
+        except Exception as e:
+            logger.warning(f"TimezoneFinder failed: {str(e)}")
+
+        # Default to Europe/Amsterdam for Netherlands
+        default_tz = 'Europe/Amsterdam'
+        self._timezone_cache[cache_key] = default_tz
+        return default_tz
+
     def _load_cached_location(self):
         """Load cached location from file"""
         try:
@@ -319,3 +299,16 @@ class WeatherService:
                 pickle.dump(cache_data, f)
         except Exception as e:
             logger.warning(f"Failed to save location to cache: {str(e)}")
+
+    def _exponential_backoff(self, retry: int) -> float:
+        """Calculate exponential backoff delay"""
+        return min(300, self._base_delay * (2**retry))
+
+    def _wait_for_rate_limit(self, retry: int = 0):
+        """Implement rate limiting with exponential backoff"""
+        current_time = time.time()
+        delay = self._exponential_backoff(retry)
+        time_since_last_call = current_time - self._last_api_call
+        if time_since_last_call < delay:
+            time.sleep(delay - time_since_last_call)
+        self._last_api_call = time.time()
