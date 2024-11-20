@@ -27,6 +27,7 @@ class WeatherService:
         self.base_url = "http://api.openweathermap.org/data/2.5"
         self._location_cache = None
         self._weather_cache = {}
+        self._pv_forecast_cache = {}  # Cache for PV forecasts
         self._cache_ttl = timedelta(seconds=cache_ttl)
         self._last_cache_time = {}
         self._cache_file = Path('.DB/location_cache.pkl')
@@ -36,6 +37,9 @@ class WeatherService:
         self._timezone_cache = {}
         self._default_location = (52.3025, 4.6889)  # Netherlands coordinates
         self._load_cached_location()
+        
+        # Clean old cache entries periodically
+        self._clean_cache()
 
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float, lat: float, lon: float) -> Dict[datetime, float]:
         """Calculate expected solar production based on weather data"""
@@ -169,12 +173,20 @@ class WeatherService:
         return production
 
     def get_pv_forecast(self, max_watt_peak: float) -> float:
-        """Get PV production forecast for current hour"""
+        """Get PV production forecast with caching"""
         try:
             if not isinstance(max_watt_peak, (int, float)) or max_watt_peak <= 0:
                 return 0.0
 
             current_hour = datetime.now(pytz.UTC).replace(minute=0, second=0, microsecond=0)
+            cache_key = f"{current_hour}_{max_watt_peak}"
+
+            # Check cache first
+            if cache_key in self._pv_forecast_cache:
+                cache_entry = self._pv_forecast_cache[cache_key]
+                if datetime.now(pytz.UTC) - cache_entry['timestamp'] < self._cache_ttl:
+                    return cache_entry['value']
+
             lat, lon = self.get_location_from_ip()
             
             # Get weather data
@@ -193,7 +205,13 @@ class WeatherService:
             time_diff = abs((closest_time - current_hour).total_seconds())
             
             if time_diff <= 3600:  # Within 1 hour
-                return pv_forecast[closest_time]
+                forecast_value = pv_forecast[closest_time]
+                # Cache the result
+                self._pv_forecast_cache[cache_key] = {
+                    'value': forecast_value,
+                    'timestamp': datetime.now(pytz.UTC)
+                }
+                return forecast_value
             
             logger.warning(f"No production data available for current hour: {current_hour}")
             return 0.0
@@ -299,6 +317,26 @@ class WeatherService:
                 pickle.dump(cache_data, f)
         except Exception as e:
             logger.warning(f"Failed to save location to cache: {str(e)}")
+
+    def _clean_cache(self):
+        """Clean expired cache entries"""
+        current_time = datetime.now(pytz.UTC)
+        # Clean weather cache
+        expired_weather = [
+            key for key, timestamp in self._last_cache_time.items()
+            if current_time - timestamp >= self._cache_ttl
+        ]
+        for key in expired_weather:
+            self._weather_cache.pop(key, None)
+            self._last_cache_time.pop(key, None)
+
+        # Clean PV forecast cache
+        expired_pv = [
+            key for key, entry in self._pv_forecast_cache.items()
+            if current_time - entry['timestamp'] >= self._cache_ttl
+        ]
+        for key in expired_pv:
+            self._pv_forecast_cache.pop(key)
 
     def _exponential_backoff(self, retry: int) -> float:
         """Calculate exponential backoff delay"""

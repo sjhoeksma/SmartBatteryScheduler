@@ -158,24 +158,31 @@ def render_price_chart(prices,
 
         # Add PV production forecast if battery has PV configured
         if 'battery' in st.session_state and st.session_state.battery.max_watt_peak > 0:
-            weather_service = WeatherService()
+            # Get all forecasts at once to avoid duplicate calculations
             pv_production = []
+            
+            # Get all forecasts at once and store them
+            forecasts = {}
             for date in prices.index:
-                forecast = weather_service.get_pv_forecast(st.session_state.battery.max_watt_peak)
-                pv_production.append(forecast)
+                if date not in forecasts:
+                    forecast = st.session_state.weather_service.get_pv_forecast(st.session_state.battery.max_watt_peak)
+                    forecasts[date] = forecast
+                    pv_production.append(forecast)
 
-            fig.add_trace(
-                go.Scatter(
-                    x=prices.index,
-                    y=pv_production,
-                    name="Solar Production",
-                    line=dict(color="rgba(241, 196, 15, 1.0)", width=3),
-                    mode='lines',
-                    fill='tozeroy',
-                    fillcolor='rgba(241, 196, 15, 0.2)',
-                    hovertemplate="Time: %{x}<br>PV Production: %{y:.2f} kW<extra></extra>"
+            # Only add trace if we have production values
+            if any(v > 0 for v in pv_production):
+                fig.add_trace(
+                    go.Scatter(
+                        x=prices.index,
+                        y=pv_production,
+                        name="Solar Production",
+                        line=dict(color="rgba(241, 196, 15, 1.0)", width=3),
+                        mode='lines',
+                        fill='tozeroy',
+                        fillcolor='rgba(241, 196, 15, 0.2)',
+                        hovertemplate="Time: %{x}<br>PV Production: %{y:.2f} kW<extra></extra>"
+                    )
                 )
-            )
 
         # Add home usage line if battery is in session state
         if 'battery' in st.session_state:
