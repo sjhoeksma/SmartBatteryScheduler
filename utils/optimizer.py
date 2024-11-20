@@ -78,7 +78,14 @@ def optimize_schedule(_prices, _battery):
     pv_forecast = {}
     if _battery.max_watt_peak > 0:
         for date in _prices.index:
-            pv_forecast[date] = weather_service.get_pv_forecast(_battery.max_watt_peak)
+            try:
+                pv_forecast[date] = weather_service.get_pv_forecast(
+                    _battery.max_watt_peak,
+                    date=date
+                )
+            except Exception as e:
+                print(f"Error getting PV forecast: {str(e)}")
+                pv_forecast[date] = 0.0
 
     # Calculate effective prices with reduced confidence weighting impact
     effective_prices = pd.Series([
@@ -202,22 +209,25 @@ def optimize_schedule(_prices, _battery):
 
         # Calculate SOC change for current hour with proper scaling
         try:
-            # Calculate SOC impacts for this hour including PV
-            consumption_soc_impact = net_consumption / _battery.capacity  # Net consumption impact after PV
-            charge_soc_impact = schedule[i] / _battery.capacity  # Charging/discharging impact
-            pv_soc_impact = min(excess_pv, available_capacity) / _battery.capacity  # Direct PV charging impact
+            # Calculate SOC impacts for this hour including PV and grid charging
+            consumption_soc_impact = net_consumption / _battery.capacity  # Net consumption after PV
+            charge_soc_impact = max(0, schedule[i]) / _battery.capacity  # Grid charging impact
+            discharge_soc_impact = abs(min(0, schedule[i])) / _battery.capacity  # Grid discharging impact
+            pv_charge_soc_impact = min(excess_pv, available_capacity) / _battery.capacity  # Direct PV charging impact
 
-            # Calculate net SOC change for this hour
-            net_soc_change = charge_soc_impact + pv_soc_impact - consumption_soc_impact
+            # Calculate net SOC change considering all factors
+            net_soc_change = (charge_soc_impact + pv_charge_soc_impact - 
+                            discharge_soc_impact - consumption_soc_impact)
 
-            # Update SOC for each 15-minute interval in this hour
+            # Update SOC for each 15-minute interval with smoother transitions
             for j in range(4):
                 point_index = i * 4 + j
                 if point_index < len(predicted_soc):
-                    # Apply proportional change for each 15-minute period
-                    interval_soc = current_soc + (net_soc_change * (j + 1) / 4)
-
-                    # Ensure SOC stays within battery limits
+                    # Progressive SOC change over 15-minute intervals
+                    progress_factor = (j + 1) / 4
+                    interval_soc = current_soc + (net_soc_change * progress_factor)
+                    
+                    # Apply battery constraints
                     predicted_soc[point_index] = np.clip(
                         interval_soc, _battery.empty_soc, _battery.max_soc)
 

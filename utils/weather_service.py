@@ -20,7 +20,9 @@ class WeatherService:
         """Initialize WeatherService with API key and cache settings"""
         self.api_key = api_key or os.environ.get('OPENWEATHERMAP_API_KEY')
         if not self.api_key:
+            logger.error("OpenWeatherMap API key is missing")
             raise ValueError("OpenWeatherMap API key is required")
+        logger.info("WeatherService initialized successfully with API key")
             
         self._base_url = "http://api.openweathermap.org/data/2.5/weather"
         self._weather_cache = {}

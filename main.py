@@ -72,7 +72,12 @@ def main():
 
     # Initialize WeatherService
     if 'weather_service' not in st.session_state:
-        st.session_state.weather_service = WeatherService()
+        try:
+            st.session_state.weather_service = WeatherService()
+            st.session_state.weather_service_initialized = True
+        except Exception as e:
+            st.error(f"Error initializing weather service: {str(e)}")
+            st.session_state.weather_service_initialized = False
 
     if 'battery' not in st.session_state:
         default_profile = st.session_state.store.get_profile("Home Battery")
