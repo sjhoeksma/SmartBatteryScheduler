@@ -7,17 +7,23 @@ from utils.translations import get_text
 
 def render_historical_analysis(prices, battery):
     """Render historical price analysis charts and insights"""
-    from utils.historical_data import analyze_price_patterns, calculate_savings_opportunity
+    from utils.historical_data import analyze_price_patterns, calculate_savings_opportunity, analyze_historical_pv_production
     
     # Get price analysis and savings opportunities
     analysis = analyze_price_patterns(prices)
     savings = calculate_savings_opportunity(prices, battery)
     
+    # Get PV production analysis if PV is configured
+    pv_analysis = None
+    if battery.max_watt_peak > 0:
+        pv_analysis = analyze_historical_pv_production(prices.index, battery, st.session_state.weather_service)
+    
     # Create tabs for different analyses
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         get_text("price_trends_tab"),
         get_text("daily_patterns_tab"),
-        get_text("savings_analysis_tab")
+        get_text("savings_analysis_tab"),
+        "PV Production Analysis"
     ])
     
     with tab1:
@@ -121,3 +127,68 @@ def render_historical_analysis(prices, battery):
         3. {get_text('best_charging_times')}
         4. {get_text('consider_weekly_patterns')}
         """)
+            
+    with tab4:
+        if pv_analysis:
+            st.subheader("Solar Production Analysis")
+            
+            # Daily production trend
+            daily_fig = go.Figure()
+            daily_fig.add_trace(
+                go.Scatter(x=pv_analysis['daily_production'].index,
+                          y=pv_analysis['daily_production'].values,
+                          name="Daily Production",
+                          line=dict(color="rgba(241, 196, 15, 1.0)", width=2))
+            )
+            daily_fig.update_layout(
+                title="Daily Solar Production",
+                xaxis_title="Date",
+                yaxis_title="Production (kWh)",
+                showlegend=True
+            )
+            st.plotly_chart(daily_fig, use_container_width=True)
+            
+            # Hourly production pattern
+            hourly_fig = go.Figure()
+            hourly_fig.add_trace(
+                go.Bar(x=pv_analysis['hourly_production'].index,
+                      y=pv_analysis['hourly_production'].values,
+                      name="Average Hourly Production",
+                      marker_color="rgba(241, 196, 15, 0.8)")
+            )
+            hourly_fig.update_layout(
+                title="Average Hourly Production Pattern",
+                xaxis_title="Hour of Day",
+                yaxis_title="Average Production (kW)",
+                showlegend=True
+            )
+            st.plotly_chart(hourly_fig, use_container_width=True)
+            
+            # Monthly production trend
+            monthly_fig = go.Figure()
+            monthly_fig.add_trace(
+                go.Bar(x=pv_analysis['monthly_production'].index,
+                      y=pv_analysis['monthly_production'].values,
+                      name="Average Monthly Production",
+                      marker_color="rgba(241, 196, 15, 0.8)")
+            )
+            monthly_fig.update_layout(
+                title="Monthly Production Pattern",
+                xaxis_title="Month",
+                yaxis_title="Average Production (kW)",
+                showlegend=True
+            )
+            st.plotly_chart(monthly_fig, use_container_width=True)
+            
+            # Production statistics
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Production", f"{pv_analysis['total_production']:.2f} kWh")
+                st.metric("System Efficiency", f"{pv_analysis['efficiency_ratio']*100:.1f}%")
+            
+            with col2:
+                st.markdown("### Peak Production Hours")
+                peak_hours_str = ", ".join([f"{hour:02d}:00" for hour in sorted(pv_analysis['peak_hours'])])
+                st.info(f"Best production hours: {peak_hours_str}")
+        else:
+            st.info("No PV installation configured. Add PV capacity in the battery configuration to see production analysis.")

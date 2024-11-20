@@ -59,6 +59,48 @@ def analyze_price_patterns(prices):
         'rolling_mean': rolling_mean
     }
 
+def analyze_historical_pv_production(dates, battery, weather_service):
+    """Analyze historical PV production patterns"""
+    if battery.max_watt_peak <= 0:
+        return None
+        
+    production_data = []
+    for date in dates:
+        production = weather_service.get_pv_forecast(battery.max_watt_peak, date)
+        production_data.append({
+            'datetime': date,
+            'production': production,
+            'hour': date.hour,
+            'day': date.day,
+            'month': date.month,
+            'dayofweek': date.weekday()
+        })
+    
+    df = pd.DataFrame(production_data)
+    
+    # Calculate daily and hourly patterns
+    daily_production = df.groupby(df['datetime'].dt.date)['production'].sum()
+    hourly_production = df.groupby('hour')['production'].mean()
+    monthly_production = df.groupby('month')['production'].mean()
+    
+    # Calculate peak production times
+    peak_hours = df.groupby('hour')['production'].mean().nlargest(5).index.tolist()
+    
+    # Calculate efficiency metrics
+    total_capacity = battery.max_watt_peak * len(dates) * 24  # Total theoretical capacity
+    actual_production = df['production'].sum()
+    efficiency_ratio = (actual_production / total_capacity) if total_capacity > 0 else 0
+    
+    return {
+        'daily_production': daily_production,
+        'hourly_production': hourly_production,
+        'monthly_production': monthly_production,
+        'peak_hours': peak_hours,
+        'total_production': actual_production,
+        'efficiency_ratio': efficiency_ratio,
+        'production_data': df
+    }
+
 def calculate_savings_opportunity(prices, battery):
     """Calculate potential savings based on historical prices"""
     if not isinstance(prices.index, pd.DatetimeIndex):
