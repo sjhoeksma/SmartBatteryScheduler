@@ -48,8 +48,17 @@ def main():
     st.markdown('''
         <style>
             .block-container {
-                padding-top: 1rem;
+                padding-top: 0.5rem;
                 padding-bottom: 0rem;
+            }
+            .stApp {
+                overflow-x: hidden;
+            }
+            .css-18e3th9 {
+                padding-top: 0rem;
+            }
+            header {
+                visibility: hidden;
             }
         </style>
     ''', unsafe_allow_html=True)
@@ -119,7 +128,7 @@ def main():
     ])
 
     with tab1:
-        st.markdown(f"<h1 style='font-size: 1.8rem; margin-bottom: 0.5rem;'>{get_text('app_title')}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='font-size: 1.8rem; margin: 0; padding: 0;'>{get_text('app_title')}</h1>", unsafe_allow_html=True)
         col1, col2 = st.columns([2, 1])
 
         with col1:
