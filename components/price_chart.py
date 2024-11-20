@@ -5,6 +5,10 @@ import pandas as pd
 from datetime import datetime, timedelta
 from utils.price_data import is_prices_available_for_tomorrow, get_price_forecast_confidence
 from utils.weather_service import WeatherService
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 # Cache the base figure layout
@@ -158,22 +162,26 @@ def render_price_chart(prices,
 
         # Add PV production forecast if battery has PV configured
         if 'battery' in st.session_state and st.session_state.battery.max_watt_peak > 0:
-            # Get all forecasts at once to avoid duplicate calculations
+            # Get all forecasts at once
+            weather_service = st.session_state.weather_service
             pv_production = []
-            
-            # Get all forecasts at once and store them
-            forecasts = {}
-            for date in prices.index:
-                if date not in forecasts:
-                    forecast = st.session_state.weather_service.get_pv_forecast(st.session_state.battery.max_watt_peak)
-                    forecasts[date] = forecast
-                    pv_production.append(forecast)
+            dates = prices.index
+
+            for date in dates:
+                production = weather_service.get_pv_forecast(
+                    st.session_state.battery.max_watt_peak,
+                    date=date
+                )
+                pv_production.append(float(production))
+
+            # Add debug logging
+            logger.info(f"PV production values: {pv_production}")
 
             # Only add trace if we have production values
             if any(v > 0 for v in pv_production):
                 fig.add_trace(
                     go.Scatter(
-                        x=prices.index,
+                        x=dates,
                         y=pv_production,
                         name="Solar Production",
                         line=dict(color="rgba(241, 196, 15, 1.0)", width=3),

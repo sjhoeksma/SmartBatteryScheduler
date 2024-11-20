@@ -112,12 +112,19 @@ class WeatherService:
 
     def calculate_solar_production(self, date, max_watt_peak):
         try:
+            # Get location data
+            lat, lon = self.get_location()
+            timezone = self.get_timezone()
+            location = pvlib.location.Location(latitude=lat, longitude=lon, tz=timezone)
+            
             # Get solar position
             times = pd.DatetimeIndex([date])
-            solar_position = self.location.get_solarposition(times)
+            solar_position = location.get_solarposition(times)
             
             # Check if sun is up and get elevation angle
-            elevation = solar_position['apparent_elevation'].iloc[0]
+            elevation = solar_position['apparent_elevation']
+            if isinstance(elevation, pd.Series):
+                elevation = elevation.iloc[0]
             
             # No production before sunrise or after sunset
             if elevation <= 0:
@@ -128,8 +135,10 @@ class WeatherService:
             cloud_cover = weather.get('clouds', {}).get('all', 0) / 100.0
             
             # Calculate clear sky radiation using proper solar model
-            clearsky = self.location.get_clearsky(times, model='ineichen')
-            ghi = clearsky['ghi'].iloc[0]  # Global horizontal irradiance
+            clearsky = location.get_clearsky(times, model='ineichen')
+            ghi = clearsky['ghi']
+            if isinstance(ghi, pd.Series):
+                ghi = ghi.iloc[0]  # Global horizontal irradiance
             
             # Calculate actual radiation considering cloud cover
             actual_ghi = ghi * (1.0 - (0.75 * cloud_cover))
