@@ -44,10 +44,18 @@ def get_cached_prices(forecast_hours):
 
 
 def main():
+    # Add custom CSS to reduce padding
+    st.markdown('''
+        <style>
+            .block-container {
+                padding-top: 1rem;
+                padding-bottom: 0rem;
+            }
+        </style>
+    ''', unsafe_allow_html=True)
+    
     # Add language selector to sidebar
     add_language_selector()
-
-    st.title(get_text("app_title"))
 
     # Initialize session state
     if 'store' not in st.session_state:
@@ -111,10 +119,11 @@ def main():
     ])
 
     with tab1:
+        st.markdown(f"<h1 style='font-size: 1.8rem; margin-bottom: 0.5rem;'>{get_text('app_title')}</h1>", unsafe_allow_html=True)
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            st.subheader("Energy Price and Charging Schedule")
+            st.markdown("### Energy Price and Charging Schedule")
 
             if prices is not None and st.session_state.battery:
                 render_price_chart(prices, schedule, predicted_soc,
