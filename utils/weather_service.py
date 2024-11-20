@@ -111,36 +111,38 @@ class WeatherService:
         return self._timezone_cache[cache_key]
 
     def calculate_solar_production(self, date, max_watt_peak):
-        """Calculate solar production for given date and PV system size"""
         try:
             # Get solar position
             times = pd.DatetimeIndex([date])
             solar_position = self.location.get_solarposition(times)
             
-            # Calculate if it's daytime and get zenith angle
-            zenith = solar_position['apparent_zenith'].iloc[0]
-            is_day = zenith < 90
+            # Check if sun is up and get elevation angle
+            elevation = solar_position['apparent_elevation'].iloc[0]
             
-            if not is_day:
+            # No production before sunrise or after sunset
+            if elevation <= 0:
                 return 0.0
             
             # Get weather data
             weather = self.get_weather_data(date)
             cloud_cover = weather.get('clouds', {}).get('all', 0) / 100.0
             
-            # Calculate clear sky radiation
-            dni_extra = pvlib.irradiance.get_extra_radiation(times.dayofyear)
-            clearsky = self.location.get_clearsky(times)
+            # Calculate clear sky radiation using proper solar model
+            clearsky = self.location.get_clearsky(times, model='ineichen')
+            ghi = clearsky['ghi'].iloc[0]  # Global horizontal irradiance
             
-            # Apply cloud cover and system efficiency
-            system_efficiency = 0.75  # Standard system efficiency
-            cloud_impact = 1.0 - (0.75 * cloud_cover)  # Cloud cover reduces production
+            # Calculate actual radiation considering cloud cover
+            actual_ghi = ghi * (1.0 - (0.75 * cloud_cover))
             
-            # Calculate actual production using solar position and weather
-            relative_production = np.cos(np.radians(zenith)) * cloud_impact
-            max_power = (max_watt_peak / 1000.0) * system_efficiency  # Convert Wp to kW
+            # Calculate PV production using realistic system efficiency
+            system_efficiency = 0.15  # Typical PV system efficiency
+            angle_factor = np.sin(np.radians(elevation))  # Sun angle impact
             
-            return max_power * relative_production
+            # Calculate final production in kW
+            production = (max_watt_peak / 1000.0) * system_efficiency * angle_factor * (actual_ghi / 1000.0)
+            
+            return max(0.0, production)  # Ensure no negative values
+            
         except Exception as e:
             logger.error(f"Error calculating solar production: {str(e)}")
             return 0.0
@@ -192,13 +194,17 @@ class WeatherService:
         raise RuntimeError("Failed to fetch weather data after multiple retries")
 
     def get_pv_forecast(self, max_watt_peak: float, date: Optional[datetime] = None) -> float:
-        """Get PV production forecast for given time"""
         if max_watt_peak <= 0:
             return 0.0
             
         if date is None:
             date = datetime.now(pytz.UTC)
-            
+        
+        # Ensure date is timezone-aware
+        if date.tzinfo is None:
+            timezone = pytz.timezone(self.get_timezone())
+            date = timezone.localize(date)
+        
         # Create cache key
         cache_key = f"{date.strftime('%Y-%m-%d-%H')}-{max_watt_peak}"
         
