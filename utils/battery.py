@@ -44,7 +44,7 @@ class Battery:
         }
         self.surcharge_rate = round(float(surcharge_rate), 3)
         self.max_daily_cycles = max_daily_cycles
-        self.max_watt_peak = max_watt_peak
+        self.max_watt_peak = float(max_watt_peak) if max_watt_peak else 0.0
         self._current_power = 0.0
         self._daily_cycles = 0.0
         self._last_reset = datetime.now().date()

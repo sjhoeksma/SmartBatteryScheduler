@@ -4,6 +4,10 @@ from datetime import datetime
 import numpy as np
 from utils.ecactus_client import get_ecactus_client
 from utils.weather_service import WeatherService
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 def get_flow_direction(power):
     """Return directional indicator based on power flow"""
@@ -19,8 +23,8 @@ def render_power_flow(battery):
         # Create container for real-time updates
         display_container = st.empty()
         
-        # Initialize weather service for PV production
-        weather_service = WeatherService()
+        # Use existing weather service instance
+        weather_service = st.session_state.weather_service
         
         def update_power_values():
             """Get power values from API or simulation"""
@@ -29,9 +33,11 @@ def render_power_flow(battery):
                 power_data = client.get_power_consumption()
                 
                 # Get PV production forecast
-                pv_forecast = weather_service.get_pv_forecast(battery.max_watt_peak)
-                current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
-                current_pv_production = pv_forecast.get(current_hour, 0.0)
+                try:
+                    current_pv_production = weather_service.get_pv_forecast(battery.max_watt_peak)
+                except Exception as e:
+                    logger.error(f"Error getting PV forecast: {str(e)}")
+                    current_pv_production = 0.0
                 
                 if power_data:
                     return (

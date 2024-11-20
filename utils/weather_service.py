@@ -31,7 +31,8 @@ class WeatherService:
         self._cache_ttl = timedelta(seconds=cache_ttl)
         self._last_cache_time = {}
         self._cache_file = Path('.DB/location_cache.pkl')
-        self._last_api_call = 0
+        self._last_api_call = time.time()
+        self._wait_time = 1.0  # Initial wait time between API calls
         self._base_delay = 1.0
         self._max_retries = 3
         self._timezone_cache = {}
@@ -42,7 +43,7 @@ class WeatherService:
         self._clean_cache()
 
     def calculate_solar_production(self, weather_data: Dict, max_watt_peak: float, lat: float, lon: float) -> Dict[datetime, float]:
-        """Calculate expected solar production based on weather data"""
+        """Calculate expected solar production based on weather data with full day profile interpolation"""
         if not isinstance(weather_data, dict) or 'list' not in weather_data:
             logger.error("Invalid weather data format")
             return {}
@@ -57,7 +58,11 @@ class WeatherService:
 
         # Create location object for solar calculations
         location = Location(latitude=lat, longitude=lon, tz=tz_name, altitude=10)
+        
+        # Initialize production dictionary for full day profile
         production = {}
+        base_hours = [6, 8, 10, 12, 14, 16, 18, 20, 22]
+        base_values = {hour: 0.0 for hour in base_hours}
 
         for forecast in weather_data['list']:
             try:
@@ -69,7 +74,7 @@ class WeatherService:
 
                 # Calculate solar position
                 solar_position = location.get_solarposition(times)
-                apparent_elevation = float(solar_position['apparent_elevation'].iloc[0])
+                apparent_elevation = float(solar_position['apparent_elevation'].values[0])
 
                 # Check if sun is below horizon
                 if apparent_elevation <= 0:
@@ -77,7 +82,7 @@ class WeatherService:
                     continue
 
                 # Calculate extra terrestrial DNI
-                dni_extra = float(pvlib.irradiance.get_extra_radiation(times.dayofyear[0]))
+                dni_extra = float(pvlib.irradiance.get_extra_radiation(times[0].dayofyear))
 
                 # Get cloud cover and calculate clearness index
                 clouds = min(max(0, forecast.get('clouds', {}).get('all', 100)), 100) / 100.0
@@ -111,8 +116,8 @@ class WeatherService:
                 surface_tilt = 30  # Typical tilt for Netherlands
                 surface_azimuth = 180  # South-facing
 
-                solar_zenith = float(solar_position['apparent_zenith'].iloc[0])
-                solar_azimuth = float(solar_position['azimuth'].iloc[0])
+                solar_zenith = float(solar_position['apparent_zenith'].values[0])
+                solar_azimuth = float(solar_position['azimuth'].values[0])
 
                 total_irrad = pvlib.irradiance.get_total_irradiance(
                     surface_tilt=surface_tilt,
@@ -131,7 +136,7 @@ class WeatherService:
                 temp_air = float(forecast.get('main', {}).get('temp', 25.0))
 
                 # Calculate cell temperature using pvsyst model with proper float handling
-                poa_global = float(total_irrad['poa_global'])
+                poa_global = float(total_irrad['poa_global'] if isinstance(total_irrad['poa_global'], (int, float)) else total_irrad['poa_global'].iloc[0])
                 temp_cell = float(pvlib.temperature.pvsyst_cell(
                     poa_global=poa_global,
                     temp_air=temp_air,
@@ -162,7 +167,13 @@ class WeatherService:
                     * inverter_efficiency
                 )
 
-                production[timestamp] = max(0, dc_power)
+                hour = local_timestamp.hour
+                if 6 <= hour <= 22:
+                    base_values[hour] = max(0, dc_power)
+                    production[timestamp] = base_values[hour]
+                else:
+                    production[timestamp] = 0.0
+
                 logger.info(f"Calculated production for {local_timestamp}: {dc_power:.2f} kW "
                           f"(clearness: {clearness_index:.2f}, weather: {weather_condition})")
 
@@ -170,12 +181,54 @@ class WeatherService:
                 logger.error(f"Error processing forecast at {timestamp}: {str(e)}")
                 production[timestamp] = 0.0
 
+        # Interpolate between base values for smooth transitions
+        hours = np.array(sorted(base_values.keys()))
+        values = np.array([base_values[h] for h in hours])
+        
+        # Create full day profile with interpolation
+        full_day_profile = {}
+        for hour in range(24):
+            if hour < 6 or hour > 22:
+                full_day_profile[hour] = 0.0
+            elif hour in base_values:
+                full_day_profile[hour] = base_values[hour]
+            else:
+                # Find nearest hours with values for interpolation
+                left_idx = int(np.searchsorted(hours, hour)) - 1
+                right_idx = min(int(left_idx + 1), len(hours) - 1)
+                
+                if left_idx >= 0:
+                    left_hour = int(hours[left_idx])
+                    right_hour = int(hours[right_idx])
+                    left_val = float(values[left_idx])
+                    right_val = float(values[right_idx])
+                    
+                    # Linear interpolation
+                    if right_hour > left_hour:
+                        weight = (hour - left_hour) / (right_hour - left_hour)
+                        interpolated_value = left_val + weight * (right_val - left_val)
+                        full_day_profile[hour] = max(0, interpolated_value)
+                    else:
+                        full_day_profile[hour] = left_val
+                else:
+                    full_day_profile[hour] = 0.0
+
+        # Update production with interpolated values
+        for timestamp in production.keys():
+            hour = timestamp.astimezone(timezone).hour
+            production[timestamp] = full_day_profile[hour]
+
         return production
 
     def get_pv_forecast(self, max_watt_peak: float) -> float:
         """Get PV production forecast with caching"""
         try:
-            if not isinstance(max_watt_peak, (int, float)) or max_watt_peak <= 0:
+            if not isinstance(max_watt_peak, (int, float)):
+                logger.warning(f"Invalid max_watt_peak type: {type(max_watt_peak)}")
+                return 0.0
+            
+            if max_watt_peak <= 0:
+                logger.debug("No PV installation configured (max_watt_peak <= 0)")
                 return 0.0
 
             current_hour = datetime.now(pytz.UTC).replace(minute=0, second=0, microsecond=0)
@@ -197,21 +250,52 @@ class WeatherService:
             # Calculate production for all hours
             pv_forecast = self.calculate_solar_production(weather_data, max_watt_peak, lat, lon)
             
-            # Find the closest forecast time
+            # Find the relevant forecast time and interpolated value
             if not pv_forecast:
                 return 0.0
+
+            # Get the forecast for the exact hour if available, otherwise interpolate
+            if current_hour in pv_forecast:
+                forecast_value = pv_forecast[current_hour]
+            else:
+                # Find the closest times before and after
+                available_times = sorted(pv_forecast.keys())
+                if not available_times:
+                    return 0.0
+                    
+                # Convert timestamps to epoch for comparison
+                available_epochs = np.array([t.timestamp() for t in available_times])
+                current_epoch = current_hour.timestamp()
                 
-            closest_time = min(pv_forecast.keys(), key=lambda x: abs(x - current_hour))
-            time_diff = abs((closest_time - current_hour).total_seconds())
-            
-            if time_diff <= 3600:  # Within 1 hour
-                forecast_value = pv_forecast[closest_time]
-                # Cache the result
-                self._pv_forecast_cache[cache_key] = {
-                    'value': forecast_value,
-                    'timestamp': datetime.now(pytz.UTC)
-                }
-                return forecast_value
+                # Find position using epoch timestamps
+                pos = int(np.searchsorted(available_epochs, current_epoch))
+                
+                if pos == 0:  # Current hour is before all forecasts
+                    forecast_value = float(pv_forecast[available_times[0]])
+                elif pos >= len(available_times):  # Current hour is after all forecasts
+                    forecast_value = float(pv_forecast[available_times[-1]])
+                else:
+                    # Interpolate between surrounding times
+                    t0 = available_times[pos-1]
+                    t1 = available_times[pos]
+                    v0 = pv_forecast[t0]
+                    v1 = pv_forecast[t1]
+                    
+                    # Calculate weight based on time difference
+                    total_diff = (t1 - t0).total_seconds()
+                    if total_diff > 0:
+                        weight = (current_hour - t0).total_seconds() / total_diff
+                        forecast_value = v0 + weight * (v1 - v0)
+                    else:
+                        forecast_value = v0
+
+            # Cache the result with the full day profile
+            self._pv_forecast_cache[cache_key] = {
+                'value': forecast_value,
+                'timestamp': datetime.now(pytz.UTC),
+                'full_profile': pv_forecast
+            }
+            return forecast_value
             
             logger.warning(f"No production data available for current hour: {current_hour}")
             return 0.0
@@ -303,6 +387,34 @@ class WeatherService:
             if self._cache_file.exists():
                 with open(self._cache_file, 'rb') as f:
                     cache_data = pickle.load(f)
+    def _wait_for_rate_limit(self, retry_count):
+        """Implement rate limiting with exponential backoff"""
+        current_time = time.time()
+        elapsed = current_time - self._last_api_call
+        
+        if elapsed < self._wait_time:
+            time.sleep(self._wait_time - elapsed)
+        
+        self._last_api_call = time.time()
+        if retry_count > 0:
+            self._wait_time = min(30, self._base_delay * (2 ** retry_count))
+        else:
+            self._wait_time = self._base_delay
+
+    def _exponential_backoff(self, retry_count):
+        """Calculate exponential backoff time"""
+        return min(300, self._base_delay * (2 ** retry_count))  # Max 5 minutes
+
+    def _clean_cache(self):
+        """Clean expired cache entries"""
+        current_time = datetime.now(pytz.UTC)
+        expired_keys = [
+            key for key, entry in self._weather_cache.items()
+            if current_time - self._last_cache_time.get(key, current_time) > self._cache_ttl
+        ]
+        for key in expired_keys:
+            self._weather_cache.pop(key, None)
+            self._last_cache_time.pop(key, None)
                     if isinstance(cache_data, dict):
                         self._location_cache = cache_data.get('location')
         except Exception as e:
