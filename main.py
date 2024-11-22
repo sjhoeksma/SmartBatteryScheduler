@@ -5,12 +5,12 @@ from datetime import datetime, timedelta
 from components.battery_config import render_battery_config
 from components.price_chart import render_price_chart
 from components.battery_status import render_battery_status
-from components.historical_analysis import render_historical_analysis
+
 from components.cost_calculator import render_cost_calculator
 from components.power_flow import render_power_flow
 from components.manual_battery_control import render_manual_battery_control
 from utils.price_data import get_day_ahead_prices, get_price_forecast_confidence
-from utils.historical_data import generate_historical_prices
+
 from utils.optimizer import optimize_schedule
 from utils.battery import Battery
 from utils.translations import get_text, add_language_selector
@@ -125,19 +125,11 @@ def main():
         st.error(f"Error updating price data: {str(e)}")
 
         # Layout
-        # tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        #     get_text("real_time_dashboard"),
-        #     get_text("manual_control"),
-        #     get_text("power_flow"),
-        #     get_text("historical_analysis"),
-        #     get_text("cost_calculator")
-        # ])
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         get_text("real_time_dashboard"),
         get_text("manual_control"),
         get_text("power_flow"),
-        get_text("historical_analysis"),
         get_text("cost_calculator")
     ])
 
@@ -179,16 +171,8 @@ def main():
             st.warning("Please configure battery settings first")
 
     with tab4:
-        st.subheader(get_text("historical_analysis"))
-        historical_prices = generate_historical_prices(days=30)
         if st.session_state.battery:
-            render_historical_analysis(historical_prices, st.session_state.battery)
-        else:
-            st.warning("Please configure battery settings first")
-
-    with tab5:
-        if st.session_state.battery and historical_prices is not None:
-            render_cost_calculator(historical_prices, st.session_state.battery)
+            render_cost_calculator(st.session_state.battery)
         else:
             st.warning("Please configure battery settings first")
 

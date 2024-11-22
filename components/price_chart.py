@@ -300,14 +300,20 @@ def render_price_chart(prices,
                     for date in prices.index
                 ]
                 
-                # Calculate totals using the fresh home_usage data
+                # Calculate totals and averages
                 total_consumption = sum(home_usage)
                 total_cost = sum(prices.values * np.array(home_usage))
+                avg_price = total_cost / total_consumption if total_consumption > 0 else 0
+
+                # Calculate cost without optimization (using grid power for all consumption)
+                total_cost_without_opt = sum(prices.values * np.array(home_usage))
                 
                 st.markdown(f'''
                 ### Energy Consumption Summary
                 - 📊 Total Predicted Consumption: {total_consumption:.2f} kWh
                 - 💰 Total Estimated Cost: €{total_cost:.2f}
+                - 💵 Average Price: €{avg_price:.3f}/kWh
+                - 🔄 Cost Without Optimization: €{total_cost_without_opt:.2f}
                 ''')
             except Exception as e:
                 logger.error(f"Error calculating consumption summary: {str(e)}")
