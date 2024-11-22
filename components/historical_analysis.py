@@ -1,6 +1,10 @@
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 from datetime import datetime, timedelta
 from utils.formatting import format_currency, format_percentage, format_number
 from utils.translations import get_text
@@ -15,8 +19,61 @@ def render_historical_analysis(prices, battery):
     
     # Get PV production analysis if PV is configured
     pv_analysis = None
-    if battery.max_watt_peak > 0:
-        pv_analysis = analyze_historical_pv_production(prices.index, battery, st.session_state.weather_service)
+    progress_bar = None
+    partial_results = None
+    daily_chart = None
+    hourly_chart = None
+    monthly_chart = None
+
+    try:
+        if battery.max_watt_peak > 0:
+            logger.info("Analyzing PV production data...")
+            
+            # Create progress bar and placeholder for partial results
+            progress_bar = st.progress(0)
+            partial_results = st.empty()
+            
+            # Initialize container for charts
+            daily_chart = st.empty()
+            hourly_chart = st.empty()
+            monthly_chart = st.empty()
+            
+            # Process data with progress tracking
+            for result in analyze_historical_pv_production(prices.index, battery, st.session_state.weather_service, progress_bar):
+                if not result['complete']:
+                    # Show partial results
+                    partial_df = result['partial_data']
+                    processed = result['processed_entries']
+                    total = result['total_entries']
+                    
+                    # Update progress message
+                    partial_results.info(f"Processing data: {processed}/{total} entries ({int(processed/total*100)}% complete)")
+                    
+                    # Show partial visualizations if enough data is available
+                    if len(partial_df) > 24:  # At least a day's worth of data
+                        with daily_chart:
+                            partial_daily = partial_df.groupby(partial_df['datetime'].dt.date)['production'].sum()
+                            fig = go.Figure()
+                            fig.add_trace(go.Scatter(x=partial_daily.index, y=partial_daily.values,
+                                                    name="Daily Production (Partial)",
+                                                    line=dict(color="rgba(241, 196, 15, 0.5)")))
+                            fig.update_layout(title="Daily Production (Processing...)")
+                            st.plotly_chart(fig, use_container_width=True)
+                else:
+                    # Clear progress indicators
+                    progress_bar.empty()
+                    partial_results.empty()
+                    
+                    if result['data']:
+                        pv_analysis = result['data']
+                        logger.info(f"Production data points: {len(pv_analysis['production_data'])}")
+                    else:
+                        st.error("Error processing PV production data")
+    except Exception as e:
+        logger.error(f"Error in PV analysis: {str(e)}")
+        st.error(f"Error analyzing PV production: {str(e)}")
+        return
+                
     
     # Create tabs for different analyses
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -140,7 +197,7 @@ def render_historical_analysis(prices, battery):
         """)
             
     with tab4:
-        if pv_analysis:
+        if pv_analysis and 'daily_production' in pv_analysis:
             st.subheader("Solar Production Analysis")
             
             # Daily production trend
