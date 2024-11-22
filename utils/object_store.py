@@ -71,7 +71,10 @@ class ObjectStore:
                     surcharge_rate=0.025,
                     max_daily_cycles=1.5,
                     max_charge_events=2,
-                    max_discharge_events=1)
+                    max_discharge_events=1,
+                    look_ahead_hours=12,
+                    current_soc=0.6,
+                    pv_efficiency=0.15)
                 self.save_profile(default_profile)
 
     def _load_schedules(self) -> List[Dict[str, Any]]:
@@ -186,7 +189,10 @@ class ObjectStore:
                     'max_daily_cycles': profile.max_daily_cycles,
                     'max_charge_events': profile.max_charge_events,
                     'max_discharge_events': profile.max_discharge_events,
-                    'max_watt_peak': profile.max_watt_peak
+                    'max_watt_peak': profile.max_watt_peak,
+                    'look_ahead_hours': profile.look_ahead_hours,
+                    'current_soc': profile.current_soc,
+                    'pv_efficiency': profile.pv_efficiency
                 }
 
             os.makedirs(os.path.dirname(self.profile_file), exist_ok=True)
@@ -254,30 +260,31 @@ class ObjectStore:
             # Ensure schedules are loaded
             if 'persist_schedules' not in st.session_state:
                 st.session_state.persist_schedules = self._load_schedules()
-            
+
             # Validate index
             if not isinstance(index, int):
                 print(f"Invalid index type: {type(index)}")
                 return False
-                
+
             # Check if index is within bounds
             if index < 0 or index >= len(st.session_state.persist_schedules):
                 print(f"Index out of range: {index}")
                 return False
-                
+
             # Remove the schedule
             removed_schedule = st.session_state.persist_schedules.pop(index)
             print(f"Removed schedule: {removed_schedule}")
-            
+
             # Save updated schedules
             if not self._save_schedules():
                 print("Failed to save schedules after removal")
                 # Revert the removal if save fails
-                st.session_state.persist_schedules.insert(index, removed_schedule)
+                st.session_state.persist_schedules.insert(
+                    index, removed_schedule)
                 return False
-                
+
             return True
-            
+
         except Exception as e:
             print(f"Error removing schedule: {str(e)}")
             return False

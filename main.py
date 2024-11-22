@@ -97,7 +97,10 @@ def main():
                 monthly_distribution=default_profile.monthly_distribution,
                 max_daily_cycles=default_profile.max_daily_cycles,
                 surcharge_rate=default_profile.surcharge_rate,
-                max_watt_peak=default_profile.max_watt_peak)
+                max_watt_peak=default_profile.max_watt_peak,
+                look_ahead_hours=default_profile.look_ahead_hours,
+                current_soc=default_profile.current_soc,
+                pv_efficiency=default_profile.pv_efficiency)
 
     # Initialize forecast hours with default value
     if 'forecast_hours' not in st.session_state:
@@ -108,6 +111,10 @@ def main():
     schedule = None
     predicted_soc = None
     consumption_stats = None
+    consumption = None
+    consumption_cost = None
+    optimize_consumption = None
+    optimize_cost = None
 
     # Get cached price forecast and optimization results
     try:
@@ -120,7 +127,7 @@ def main():
         # Get prices and optimization results
         prices = get_cached_prices(st.session_state.forecast_hours)
         if prices is not None and st.session_state.battery:
-            schedule, predicted_soc, consumption_stats = optimize_schedule(
+            schedule, predicted_soc, consumption_stats, consumption, consumption_cost, optimize_consumption, optimize_cost = optimize_schedule(
                 prices, st.session_state.battery)
     except Exception as e:
         st.error(f"Error updating price data: {str(e)}")
@@ -148,6 +155,17 @@ def main():
             else:
                 st.warning("No price data available")
 
+            st.markdown(f'''
+                ### Energy Consumption Summary
+                - 📊 Total Predicted Consumption: {consumption:.2f} kWh
+                - 💰 Total Estimated Cost: €{consumption_cost:.2f}
+                - 💵 Average Price: €{consumption_cost/consumption:.3f}/kWh
+                - 📊 Optimization Consumption: {optimize_consumption:.2f} kWh
+                - 💰 Optimization Cost: €{optimize_cost:.2f}
+                - 💵 Average Optimization Price: €{optimize_cost/optimize_consumption:.3f}/kWh
+                - 💰 Saving: €{consumption_cost-optimize_cost:.2f}
+                ''')
+
         with col2:
             st.subheader(get_text("battery_config"))
             render_battery_config()
@@ -159,10 +177,10 @@ def main():
     with tab2:
         if st.session_state.battery:
             render_manual_battery_control(st.session_state.battery,
-                                      prices=prices,
-                                      schedule=schedule,
-                                      predicted_soc=predicted_soc,
-                                      consumption_stats=consumption_stats)
+                                          prices=prices,
+                                          schedule=schedule,
+                                          predicted_soc=predicted_soc,
+                                          consumption_stats=consumption_stats)
         else:
             st.warning("Please configure battery settings first")
 
@@ -176,7 +194,8 @@ def main():
         if st.session_state.battery and prices is not None:
             render_cost_calculator(prices, st.session_state.battery)
         else:
-            st.warning("Please configure battery settings and wait for price data")
+            st.warning(
+                "Please configure battery settings and wait for price data")
     with tab5:
         if st.session_state.battery:
             render_historical_analysis(st.session_state.battery)

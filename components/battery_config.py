@@ -178,14 +178,14 @@ def render_battery_config():
             )
 
             # Add PV Efficency configuration
-            # max_watt_peak = st.number_input(
-            #     "PV Efficiency",
-            #     min_value=0.0,
-            #     max_value=1.0,
-            #     value=float(profile.pv_efficiency),
-            #     step=100.0,
-            #     help="PV Efficiency"
-            # )
+            pv_efficiency = st.slider("PV efficiency",
+                                      min_value=0.0,
+                                      max_value=1.0,
+                                      value=float(profile.pv_efficiency))
+            current_soc = st.slider(get_text("current_soc"),
+                                    min_value=0.0,
+                                    max_value=1.0,
+                                    value=float(profile.current_soc))
 
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(
@@ -207,7 +207,9 @@ def render_battery_config():
                 monthly_distribution=profile.monthly_distribution,
                 surcharge_rate=round(surcharge_rate, 3),
                 max_daily_cycles=max_daily_cycles,
-                max_watt_peak=max_watt_peak)
+                max_watt_peak=max_watt_peak,
+                current_soc=current_soc,
+                pv_efficiency=pv_efficiency)
 
             # Save updated profile and update battery instance
             st.session_state.store.save_profile(updated_profile)

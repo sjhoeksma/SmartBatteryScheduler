@@ -76,7 +76,10 @@ def optimize_schedule(_prices, _battery):
     predicted_soc = np.zeros(periods * 4)  # Removed the +1 to fix alignment
     consumption_stats = analyze_consumption_patterns(_battery, _prices.index)
     weather_service = st.session_state.weather_service
-
+    consumption = 0
+    consumption_cost = 0.0
+    optimize_consumption = 0
+    optimize_cost = 0.0
     # Get PV production forecast for optimization period
     pv_forecast = {}
     if _battery.max_watt_peak > 0:
@@ -140,13 +143,14 @@ def optimize_schedule(_prices, _battery):
             future_prices) > 0 else future_max_price
 
         # Add strict peak detection with higher threshold
-        is_peak = current_price >= future_prices.quantile(0.95) if len(
-            future_prices) > 0 else True
+        peak_quantile = 0.95 - (0.05 * current_soc)
+        is_peak = current_price >= future_prices.quantile(
+            peak_quantile) if len(future_prices) > 0 else True
 
         # How lower the soc how wider the quantile
-        soc_quantile = 0.05 + (0.10 * (1 - (current_soc / 100)))
+        valley_quantile = 0.05 + (0.10 * (1 - current_soc))
         is_valley = current_price <= future_prices.quantile(
-            soc_quantile) if len(future_prices) > 0 else True
+            valley_quantile) if len(future_prices) > 0 else True
 
         # Optimize charging/discharging decision with bounds checking
         available_capacity = _battery.capacity * (_battery.max_soc -
@@ -160,7 +164,12 @@ def optimize_schedule(_prices, _battery):
 
         # Include PV production in decision making
         net_consumption = max(0, current_hour_consumption - current_pv)
+        consumption += net_consumption
+        consumption_cost += _prices.iloc[i] * net_consumption
+
         excess_pv = max(0, current_pv - current_hour_consumption)
+        consumption -= excess_pv
+        consumption_cost -= _prices.iloc[i] * excess_pv
 
         # Prioritize storing excess PV production
         if excess_pv > 0 and available_capacity > 0:
@@ -194,8 +203,8 @@ def optimize_schedule(_prices, _battery):
                         'cycles'] += max_allowed_charge / _battery.capacity
 
             # Add peak price preservation check with more sensitive threshold or battery full
-            elif not is_peak and future_prices.max() > current_price * 1.05:
-                pass  # Skip discharge, better prices coming, but calculated SOC
+            # elif not is_peak and future_prices.max() > current_price * 1.05:
+            #     pass  # Skip discharge, better prices coming, but calculated SOC
 
             # Discharging decision with peak detection and relative threshold
             elif (is_peak and future_max_price != 0
@@ -284,4 +293,8 @@ def optimize_schedule(_prices, _battery):
         current_soc = np.clip(current_soc, _battery.empty_soc,
                               _battery.max_soc)
 
-    return schedule, predicted_soc, consumption_stats
+    for i in range(periods):
+        optimize_consumption += schedule[i]
+        optimize_cost += _prices.iloc[i] * schedule[i]
+
+    return schedule, predicted_soc, consumption_stats, consumption, consumption_cost, optimize_consumption, optimize_cost

@@ -133,7 +133,7 @@ TRANSLATIONS: Dict[str, Translation] = {
 
     # Battery configuration translations
     "battery_config":
-    Translation(en="Battery Configuration", nl="Batterij Configuratie"),
+    Translation(en="Simulation Configuration", nl="Simulatie Configuratie"),
     "battery_capacity":
     Translation(en="Battery Capacity (kWh)", nl="Batterijcapaciteit (kWh)"),
     "empty_soc":
@@ -173,15 +173,20 @@ TRANSLATIONS: Dict[str, Translation] = {
 
     # Historical analysis translations
     "historical_pv_analysis":
-    Translation(en="Historical PV Production Analysis", nl="Historische PV-productie Analyse"),
+    Translation(en="Historical PV Production Analysis",
+                nl="Historische PV-productie Analyse"),
     "no_pv_configured":
-    Translation(en="No PV system configured. Please configure PV settings first.", nl="Geen PV-systeem geconfigureerd. Configureer eerst PV-instellingen."),
+    Translation(
+        en="No PV system configured. Please configure PV settings first.",
+        nl="Geen PV-systeem geconfigureerd. Configureer eerst PV-instellingen."
+    ),
     "start_date":
     Translation(en="Start Date", nl="Startdatum"),
     "end_date":
     Translation(en="End Date", nl="Einddatum"),
     "date_range_error":
-    Translation(en="End date must be after start date", nl="Einddatum moet na startdatum liggen"),
+    Translation(en="End date must be after start date",
+                nl="Einddatum moet na startdatum liggen"),
     "daily_production":
     Translation(en="Daily Production", nl="Dagelijkse Productie"),
     "daily_pv_production":
