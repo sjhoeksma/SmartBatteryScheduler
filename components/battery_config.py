@@ -77,7 +77,7 @@ def render_battery_config():
         st.session_state.current_profile = current_profile_name
 
     # Profile selection with delete button
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2, col3 = st.columns([5, 1, 1])
     with col1:
         current_profile = st.selectbox(get_text("battery_profile"),
                                        profiles,
@@ -171,11 +171,21 @@ def render_battery_config():
             max_watt_peak = st.number_input(
                 "PV Installation Size (Wp)",
                 min_value=0.0,
-                max_value=20000.0,
+                max_value=50000.0,
                 value=float(profile.max_watt_peak),
                 step=100.0,
                 help="Maximum power output of your PV installation in Watt peak"
             )
+
+            # Add PV Efficency configuration
+            # max_watt_peak = st.number_input(
+            #     "PV Efficiency",
+            #     min_value=0.0,
+            #     max_value=1.0,
+            #     value=float(profile.pv_efficiency),
+            #     step=100.0,
+            #     help="PV Efficiency"
+            # )
 
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(

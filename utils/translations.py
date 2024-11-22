@@ -5,18 +5,18 @@ from dataclasses import dataclass
 
 @dataclass
 class Translation:
-    en: str
-    nl: str
+            en: str
+            nl: str
 
 
 # Dictionary of translations
 TRANSLATIONS: Dict[str, Translation] = {
     # Main interface translations
     "app_title":
-    Translation(en="⚡ Energy Management Dashboard",
-                nl="⚡ Energiebeheer Dashboard"),
+    Translation(en="⚡ Energy Management Simulator",
+                nl="⚡ Energiebeheer Simulatie"),
     "real_time_dashboard":
-    Translation(en="Real-time Dashboard", nl="Real-time Dashboard"),
+    Translation(en="Simulator", nl="Simulatie"),
     "historical_analysis":
     Translation(en="Historical Analysis", nl="Historische Analyse"),
     "historical_price_trends":
@@ -301,33 +301,34 @@ TRANSLATIONS: Dict[str, Translation] = {
 
 
 def get_browser_language() -> str:
-    """Get the browser's language preference."""
-    # Default to English if not set
-    if 'language' not in st.session_state:
-        st.session_state.language = 'en'
-    return st.session_state.language
+            """Get the browser's language preference."""
+            # Default to English if not set
+            if 'language' not in st.session_state:
+                        st.session_state.language = 'en'
+            return st.session_state.language
 
 
 def set_language(lang: str) -> None:
-    """Set the application language."""
-    if lang in ['en', 'nl']:
-        st.session_state.language = lang
+            """Set the application language."""
+            if lang in ['en', 'nl']:
+                        st.session_state.language = lang
 
 
 def get_text(key: str) -> str:
-    """Get translated text for the current language."""
-    lang = get_browser_language()
-    translation = TRANSLATIONS.get(key)
-    if translation is None:
-        return f"Missing translation: {key}"
-    return getattr(translation, lang)
+            """Get translated text for the current language."""
+            lang = get_browser_language()
+            translation = TRANSLATIONS.get(key)
+            if translation is None:
+                        return f"Missing translation: {key}"
+            return getattr(translation, lang)
 
 
 def add_language_selector():
-    """Add a language selector widget to the sidebar."""
-    st.sidebar.selectbox(
-        "🌐 Language / Taal",
-        options=['en', 'nl'],
-        format_func=lambda x: "English" if x == "en" else "Nederlands",
-        key="language_selector",
-        on_change=lambda: set_language(st.session_state.language_selector))
+            """Add a language selector widget to the sidebar."""
+            st.sidebar.selectbox("🌐 Language / Taal",
+                                 options=['en', 'nl'],
+                                 format_func=lambda x: "English"
+                                 if x == "en" else "Nederlands",
+                                 key="language_selector",
+                                 on_change=lambda: set_language(
+                                     st.session_state.language_selector))
