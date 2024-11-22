@@ -53,8 +53,12 @@ def render_historical_analysis(prices, battery):
             row=2, col=1
         )
         
-        fig.update_layout(height=600, showlegend=True)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(
+            height=600,
+            showlegend=True,
+            modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+        )
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
         
         # Display trend insights
         st.info(f"📈 {get_text('price_trend')}: {analysis['trend_direction']}")
@@ -82,8 +86,12 @@ def render_historical_analysis(prices, battery):
             row=1, col=2
         )
         
-        pattern_fig.update_layout(height=400, showlegend=True)
-        st.plotly_chart(pattern_fig, use_container_width=True)
+        pattern_fig.update_layout(
+            height=400,
+            showlegend=True,
+            modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+        )
+        st.plotly_chart(pattern_fig, use_container_width=True, config={'displayModeBar': True})
         
         # Display pattern insights
         col1, col2 = st.columns(2)
@@ -117,7 +125,10 @@ def render_historical_analysis(prices, battery):
             xaxis_title=get_text("day_of_week"),
             yaxis_title=get_text("avg_potential_savings")
         )
-        st.plotly_chart(savings_fig, use_container_width=True)
+        savings_fig.update_layout(
+            modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+        )
+        st.plotly_chart(savings_fig, use_container_width=True, config={'displayModeBar': True})
         
         # Display optimization recommendations
         st.info(f"""
@@ -146,7 +157,10 @@ def render_historical_analysis(prices, battery):
                 yaxis_title="Production (kWh)",
                 showlegend=True
             )
-            st.plotly_chart(daily_fig, use_container_width=True)
+            daily_fig.update_layout(
+                modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+            )
+            st.plotly_chart(daily_fig, use_container_width=True, config={'displayModeBar': True})
             
             # Hourly production pattern
             hourly_fig = go.Figure()
@@ -162,7 +176,10 @@ def render_historical_analysis(prices, battery):
                 yaxis_title="Average Production (kW)",
                 showlegend=True
             )
-            st.plotly_chart(hourly_fig, use_container_width=True)
+            hourly_fig.update_layout(
+                modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+            )
+            st.plotly_chart(hourly_fig, use_container_width=True, config={'displayModeBar': True})
             
             # Monthly production trend
             monthly_fig = go.Figure()
@@ -178,7 +195,10 @@ def render_historical_analysis(prices, battery):
                 yaxis_title="Average Production (kW)",
                 showlegend=True
             )
-            st.plotly_chart(monthly_fig, use_container_width=True)
+            monthly_fig.update_layout(
+                modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+            )
+            st.plotly_chart(monthly_fig, use_container_width=True, config={'displayModeBar': True})
             
             # Production statistics
             col1, col2 = st.columns(2)

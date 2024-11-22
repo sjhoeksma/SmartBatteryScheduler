@@ -279,9 +279,15 @@ def render_price_chart(prices,
                               "Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"))
 
         # Add unique key to plotly chart to fix StreamlitDuplicateElementId error
-        st.plotly_chart(fig,
-                       use_container_width=True,
-                       key=f"price_chart_{datetime.now().timestamp()}")
+        fig.update_layout(
+            modebar={'remove': ['drawline', 'drawopenpath', 'drawclosedpath', 'drawcircle']}
+        )
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={'displayModeBar': True},
+            key=f"price_chart_{datetime.now().timestamp()}"
+        )
 
         # Add cached legends with dynamic price thresholds
         if len(prices) > 0:

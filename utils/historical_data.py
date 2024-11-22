@@ -84,7 +84,7 @@ def analyze_historical_pv_production(dates, battery, weather_service):
     monthly_production = df.groupby('month')['production'].mean()
     
     # Calculate peak production times
-    peak_hours = df.groupby('hour')['production'].mean().nlargest(5).index.tolist()
+    peak_hours = df.groupby('hour')['production'].mean().nlargest(n=5).index.tolist()
     
     # Calculate efficiency metrics
     total_capacity = battery.max_watt_peak * len(dates) * 24  # Total theoretical capacity
