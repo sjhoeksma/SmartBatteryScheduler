@@ -117,8 +117,7 @@ def analyze_historical_pv_production(_dates,
 
         # Get peak hours using proper sorting
         hour_means = df.groupby('hour')['production'].mean()
-        peak_hours = hour_means.sort_values(
-            ascending=False).head(5).index.tolist()
+        peak_hours = hour_means.sort_values(ascending=False).head(5).index.tolist()
 
         # Calculate efficiency
         total_capacity = float(_battery.max_watt_peak * len(_dates) * 24)

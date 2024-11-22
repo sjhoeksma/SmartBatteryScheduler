@@ -290,6 +290,29 @@ def render_price_chart(prices,
                         config={'displayModeBar': True},
                         key=f"price_chart_{datetime.now().timestamp()}")
 
+        # Calculate total consumption and cost
+        if 'battery' in st.session_state:
+            try:
+                # Always calculate home usage to ensure we have fresh data
+                battery = st.session_state.battery
+                home_usage = [
+                    battery.get_hourly_consumption(date.hour, date)
+                    for date in prices.index
+                ]
+                
+                # Calculate totals using the fresh home_usage data
+                total_consumption = sum(home_usage)
+                total_cost = sum(prices.values * np.array(home_usage))
+                
+                st.markdown(f'''
+                ### Energy Consumption Summary
+                - 📊 Total Predicted Consumption: {total_consumption:.2f} kWh
+                - 💰 Total Estimated Cost: €{total_cost:.2f}
+                ''')
+            except Exception as e:
+                logger.error(f"Error calculating consumption summary: {str(e)}")
+                st.warning("Unable to calculate consumption summary")
+
         # Add cached legends with dynamic price thresholds
         if len(prices) > 0:
             price_75th = np.percentile(prices, 75)
