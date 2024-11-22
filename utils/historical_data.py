@@ -61,7 +61,7 @@ def analyze_price_patterns(prices):
     }
 
 @st.cache_data(ttl=3600)  # Cache results for 1 hour
-def analyze_historical_pv_production(dates, battery, weather_service, progress_bar=None):
+def analyze_historical_pv_production(_dates, battery, weather_service, progress_bar=None):
     """Analyze historical PV production patterns with batch processing and caching"""
     import logging
     logger = logging.getLogger(__name__)
@@ -76,13 +76,13 @@ def analyze_historical_pv_production(dates, battery, weather_service, progress_b
             return None
 
         production_data = []
-        total_entries = len(dates)
+        total_entries = len(_dates)
         successful_entries = 0
         batch_size = 24  # Process 24 hours at a time
         
         # Process data in batches
         for i in range(0, total_entries, batch_size):
-            batch_dates = dates[i:i + batch_size]
+            batch_dates = _dates[i:i + batch_size]
             batch_data = []
             
             # Update progress bar if provided
@@ -146,10 +146,10 @@ def analyze_historical_pv_production(dates, battery, weather_service, progress_b
             
             # Calculate peak production times
             hourly_means = df.groupby('hour')['production'].mean()
-            peak_hours = hourly_means.sort_values(ascending=False).head(5).index.tolist()
+            peak_hours = hourly_means.sort_values(ascending=False, inplace=False).head(5).index.tolist()
             
             # Calculate efficiency metrics
-            total_capacity = battery.max_watt_peak * len(dates) * 24  # Total theoretical capacity
+            total_capacity = battery.max_watt_peak * len(_dates) * 24  # Total theoretical capacity
             actual_production = df['production'].sum()
             efficiency_ratio = (actual_production / total_capacity) if total_capacity > 0 else 0
             
