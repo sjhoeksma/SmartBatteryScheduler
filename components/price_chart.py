@@ -300,13 +300,31 @@ def render_price_chart(prices,
                     for date in prices.index
                 ]
                 
+                # Initialize PV production array
+                pv_production = []
+                if battery.max_watt_peak > 0:
+                    weather_service = st.session_state.weather_service
+                    for date in prices.index:
+                        production = weather_service.get_pv_forecast(
+                            battery.max_watt_peak,
+                            battery.pv_efficiency,
+                            date=date)
+                        pv_production.append(float(production))
+                else:
+                    pv_production = [0.0] * len(home_usage)
+
                 # Calculate totals and averages
                 total_consumption = sum(home_usage)
-                total_cost = sum(prices.values * np.array(home_usage))
+                
+                # Calculate net consumption (after PV production)
+                net_consumption = np.array([
+                    max(0, usage - pv) for usage, pv in zip(home_usage, pv_production)
+                ])
+                total_cost = sum(prices.values * net_consumption)
                 avg_price = total_cost / total_consumption if total_consumption > 0 else 0
 
-                # Calculate cost without optimization (using grid power for all consumption)
-                total_cost_without_opt = sum(prices.values * np.array(home_usage))
+                # Calculate cost without optimization (using grid power for net consumption)
+                total_cost_without_opt = sum(prices.values * net_consumption)
                 
                 st.markdown(f'''
                 ### Energy Consumption Summary

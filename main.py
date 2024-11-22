@@ -9,6 +9,7 @@ from components.battery_status import render_battery_status
 from components.cost_calculator import render_cost_calculator
 from components.power_flow import render_power_flow
 from components.manual_battery_control import render_manual_battery_control
+from components.historical_analysis import render_historical_analysis
 from utils.price_data import get_day_ahead_prices, get_price_forecast_confidence
 
 from utils.optimizer import optimize_schedule
@@ -126,11 +127,12 @@ def main():
 
         # Layout
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         get_text("real_time_dashboard"),
         get_text("manual_control"),
         get_text("power_flow"),
-        get_text("cost_calculator")
+        get_text("cost_calculator"),
+        get_text("historical_analysis")
     ])
 
     with tab1:
@@ -171,8 +173,13 @@ def main():
             st.warning("Please configure battery settings first")
 
     with tab4:
+        if st.session_state.battery and prices is not None:
+            render_cost_calculator(prices, st.session_state.battery)
+        else:
+            st.warning("Please configure battery settings and wait for price data")
+    with tab5:
         if st.session_state.battery:
-            render_cost_calculator(st.session_state.battery)
+            render_historical_analysis(st.session_state.battery)
         else:
             st.warning("Please configure battery settings first")
 

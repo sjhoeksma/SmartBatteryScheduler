@@ -172,6 +172,38 @@ TRANSLATIONS: Dict[str, Translation] = {
     Translation(en="Last updated", nl="Laatst bijgewerkt"),
 
     # Historical analysis translations
+    "historical_pv_analysis":
+    Translation(en="Historical PV Production Analysis", nl="Historische PV-productie Analyse"),
+    "no_pv_configured":
+    Translation(en="No PV system configured. Please configure PV settings first.", nl="Geen PV-systeem geconfigureerd. Configureer eerst PV-instellingen."),
+    "start_date":
+    Translation(en="Start Date", nl="Startdatum"),
+    "end_date":
+    Translation(en="End Date", nl="Einddatum"),
+    "date_range_error":
+    Translation(en="End date must be after start date", nl="Einddatum moet na startdatum liggen"),
+    "daily_production":
+    Translation(en="Daily Production", nl="Dagelijkse Productie"),
+    "daily_pv_production":
+    Translation(en="Daily PV Production", nl="Dagelijkse PV-productie"),
+    "date":
+    Translation(en="Date", nl="Datum"),
+    "energy_kwh":
+    Translation(en="Energy (kWh)", nl="Energie (kWh)"),
+    "hourly_production":
+    Translation(en="Hourly Production", nl="Uurlijkse Productie"),
+    "hourly_pv_production":
+    Translation(en="Hourly PV Production", nl="Uurlijkse PV-productie"),
+    "hour_of_day":
+    Translation(en="Hour of Day", nl="Uur van de Dag"),
+    "production_statistics":
+    Translation(en="Production Statistics", nl="Productiestatistieken"),
+    "total_production":
+    Translation(en="Total Production", nl="Totale Productie"),
+    "average_daily":
+    Translation(en="Average Daily", nl="Gemiddeld Dagelijks"),
+    "peak_production":
+    Translation(en="Peak Production", nl="Piekproductie"),
     "price_trend":
     Translation(en="Price Trend", nl="Prijstrend"),
     "peak_hours":
