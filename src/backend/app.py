@@ -10,8 +10,6 @@ def create_app():
     # Initialize services
     if 'price_service' not in st.session_state:
         st.session_state.price_service = PriceService()
-
     if 'weather_service' not in st.session_state:
         st.session_state.weather_service = WeatherService()
-
     return True

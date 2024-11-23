@@ -80,18 +80,20 @@ def render_battery_config():
     # Profile selection with delete button
     col1, col2, col3 = st.columns([5, 1, 1])
     with col1:
-        current_profile = st.selectbox(get_text("battery_profile"),
-                                       profiles,
-                                       index=profiles.index(
-                                           st.session_state.current_profile))
+        current_profile = st.selectbox(
+        get_text("battery_profile"),
+        profiles,
+        index=profiles.index(st.session_state.current_profile),
+        key=f"battery_profile_{id(profiles)}"
+    )
         st.session_state.current_profile = current_profile
     with col2:
-        if st.button("🔄", key="reload"):
+        if st.button("🔄", key=f"reload_battery_profile_{id(profiles)}"):
             st.cache_data.clear()
             st.rerun()
 
     with col3:
-        if st.button("🗑️", key="delete_profile"):
+        if st.button("🗑️", key=f"delete_profile_{id(profiles)}"):
             if current_profile != "Home Battery":  # Prevent deletion of default profile
                 st.session_state.store.remove_profile(current_profile)
                 st.rerun()
@@ -102,7 +104,7 @@ def render_battery_config():
         st.error("Selected profile not found")
         return
 
-    with st.form("battery_config"):
+    with st.form(f"battery_config_{id(current_profile)}"):
         col1, col2 = st.columns(2)
 
         with col1:
@@ -239,7 +241,7 @@ def render_battery_config():
 
     # New profile creation
     st.markdown(f"### {get_text('create_new_profile')}")
-    with st.form("new_profile"):
+    with st.form(f"new_profile_{id(current_profile)}"):
         new_name = st.text_input(get_text("profile_name"))
         if st.form_submit_button("Create Profile"):
             if new_name and new_name not in profiles:

@@ -4,7 +4,12 @@ from frontend.translations import add_language_selector, get_text
 from frontend.components.battery_config import render_battery_config
 from core.object_store import ObjectStore
 
-# Must be the first Streamlit command
+from backend.app import create_app
+
+# Initialize services first
+create_app()
+
+# Then set page config
 st.set_page_config(page_title="Energy Management Dashboard",
                   page_icon="⚡",
                   layout="wide",
@@ -98,8 +103,14 @@ def main():
         prices = get_cached_prices(st.session_state.forecast_hours)
         if prices is not None and st.session_state.battery:
             optimizer = Optimizer(st.session_state.battery)
-            schedule, predicted_soc, consumption_stats, consumption, consumption_cost, optimize_consumption, optimize_cost = optimizer.optimize_schedule(
-                prices)
+            result = optimizer.optimize_schedule(prices)
+            schedule = result.schedule
+            predicted_soc = result.predicted_soc
+            consumption_stats = result.consumption_stats
+            consumption = result.consumption
+            consumption_cost = result.consumption_cost
+            optimize_consumption = result.optimize_consumption
+            optimize_cost = result.optimize_cost
     except Exception as e:
         st.error(f"Error updating price data: {str(e)}")
 

@@ -31,8 +31,7 @@ def get_max_forecast_hours():
         return remaining_hours  # Only return remaining hours of current day
 
 
-# Initialize app and services
-create_app()
+
 
 
 # Cache price data with TTL based on forecast hours
