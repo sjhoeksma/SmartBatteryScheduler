@@ -358,6 +358,10 @@ TRANSLATIONS: Dict[str, Translation] = {
     Translation(en="Day-heavy", nl="Dag-intensief"),
     "usage_pattern_night":
     Translation(en="Night-heavy", nl="Nacht-intensief"),
+    "usage_pattern_optimize":
+    Translation(en="Optimize", nl="Optimaliseren"),
+    "usage_pattern_conservative":
+    Translation(en="Conservative", nl="Conservatief"),
 }
 
 
