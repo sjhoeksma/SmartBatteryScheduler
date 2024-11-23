@@ -1,11 +1,14 @@
 import streamlit as st
 from frontend.main import main
+from frontend.translations import add_language_selector, get_text
+
+# Must be the first Streamlit command
+st.set_page_config(page_title="Energy Management Dashboard",
+                  page_icon="⚡",
+                  layout="wide",
+                  initial_sidebar_state="collapsed")
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="Energy Management Dashboard",
-                      page_icon="⚡",
-                      layout="wide",
-                      initial_sidebar_state="collapsed")
     main()
 
 
