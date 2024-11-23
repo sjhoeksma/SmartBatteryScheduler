@@ -121,24 +121,14 @@ def main():
         prices = get_cached_prices(st.session_state.forecast_hours)
         if prices is not None and st.session_state.battery:
             optimizer = Optimizer(st.session_state.battery)
-            try:
-                optimization_result = optimizer.optimize_schedule(prices)
-                schedule = optimization_result.schedule
-                predicted_soc = optimization_result.predicted_soc
-                consumption_stats = optimization_result.consumption_stats
-                consumption = optimization_result.consumption
-                consumption_cost = optimization_result.consumption_cost
-                optimize_consumption = optimization_result.optimize_consumption
-                optimize_cost = optimization_result.optimize_cost
-            except Exception as e:
-                st.error(f"Error during optimization: {str(e)}")
-                schedule = None
-                predicted_soc = None
-                consumption_stats = None
-                consumption = None
-                consumption_cost = None
-                optimize_consumption = None
-                optimize_cost = None
+            optimization_result = optimizer.optimize_schedule(prices)
+            schedule = optimization_result.schedule
+            predicted_soc = optimization_result.predicted_soc
+            consumption_stats = optimization_result.consumption_stats
+            consumption = optimization_result.consumption
+            consumption_cost = optimization_result.consumption_cost
+            optimize_consumption = optimization_result.optimize_consumption
+            optimize_cost = optimization_result.optimize_cost
     except Exception as e:
         st.error(f"Error updating price data: {str(e)}")
 
