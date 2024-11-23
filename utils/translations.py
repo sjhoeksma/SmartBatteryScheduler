@@ -133,7 +133,7 @@ TRANSLATIONS: Dict[str, Translation] = {
 
     # Battery configuration translations
     "battery_config":
-    Translation(en="Simulation Configuration", nl="Simulatie Configuratie"),
+    Translation(en="Configuration", nl="Configuratie"),
     "battery_capacity":
     Translation(en="Battery Capacity (kWh)", nl="Batterijcapaciteit (kWh)"),
     "empty_soc":

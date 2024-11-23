@@ -138,6 +138,11 @@ def render_battery_config():
                                                step=0.1,
                                                format="%.1f")
 
+            current_soc = st.slider(get_text("current_soc"),
+                                    min_value=0.0,
+                                    max_value=1.0,
+                                    value=float(profile.current_soc))
+
         with col2:
             surcharge_rate = st.number_input(
                 "Surcharge Rate (€/kWh)",
@@ -182,10 +187,6 @@ def render_battery_config():
                                       min_value=0.0,
                                       max_value=1.0,
                                       value=float(profile.pv_efficiency))
-            current_soc = st.slider(get_text("current_soc"),
-                                    min_value=0.0,
-                                    max_value=1.0,
-                                    value=float(profile.current_soc))
 
         # Show monthly distribution visualization
         st.plotly_chart(render_monthly_distribution(
