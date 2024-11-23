@@ -15,10 +15,7 @@ from core.price_data import get_day_ahead_prices, get_price_forecast_confidence
 from frontend.translations import get_text, add_language_selector
 from core.object_store import ObjectStore
 
-st.set_page_config(page_title="Energy Management Dashboard",
-                   page_icon="⚡",
-                   layout="wide",
-                   initial_sidebar_state="collapsed")
+# Page config moved to app.py
 
 
 def get_max_forecast_hours():
@@ -34,9 +31,8 @@ def get_max_forecast_hours():
         return remaining_hours  # Only return remaining hours of current day
 
 
-# Initialize services
-if 'price_service' not in st.session_state:
-    st.session_state.price_service = PriceService()
+# Initialize app and services
+create_app()
 
 
 # Cache price data with TTL based on forecast hours
