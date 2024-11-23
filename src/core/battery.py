@@ -5,28 +5,27 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Union, Any
 
+
 class Battery:
     """Battery energy storage system simulation and management"""
-    
-    def __init__(
-        self,
-        capacity: float,
-        empty_soc: float,
-        min_soc: float,
-        max_soc: float,
-        charge_rate: float,
-        profile_name: Optional[str] = None,
-        daily_consumption: float = 15.0,
-        usage_pattern: str = "Flat",
-        yearly_consumption: float = 5475.0,
-        monthly_distribution: Optional[Dict[int, float]] = None,
-        surcharge_rate: float = 0.050,
-        max_daily_cycles: float = 1.5,
-        max_watt_peak: float = 0.0,
-        look_ahead_hours: int = 12,
-        current_soc: float = 0.5,
-        pv_efficiency: float = 0.15
-    ):
+
+    def __init__(self,
+                 capacity: float,
+                 empty_soc: float,
+                 min_soc: float,
+                 max_soc: float,
+                 charge_rate: float,
+                 profile_name: Optional[str] = None,
+                 daily_consumption: float = 15.0,
+                 usage_pattern: str = "Flat",
+                 yearly_consumption: float = 5475.0,
+                 monthly_distribution: Optional[Dict[int, float]] = None,
+                 surcharge_rate: float = 0.050,
+                 max_daily_cycles: float = 1.5,
+                 max_watt_peak: float = 0.0,
+                 look_ahead_hours: int = 12,
+                 current_soc: float = 0.5,
+                 pv_efficiency: float = 0.15):
         """Initialize battery with given parameters"""
         self.capacity = capacity
         self.empty_soc = empty_soc
@@ -38,9 +37,18 @@ class Battery:
         self.usage_pattern = usage_pattern
         self.yearly_consumption = yearly_consumption
         self.monthly_distribution = monthly_distribution or {
-            1: 1.2, 2: 1.15, 3: 1.0, 4: 0.9, 5: 0.8,
-            6: 0.7, 7: 0.7, 8: 0.7, 9: 0.8, 10: 0.9,
-            11: 1.0, 12: 1.15
+            1: 1.2,
+            2: 1.15,
+            3: 1.0,
+            4: 0.9,
+            5: 0.8,
+            6: 0.7,
+            7: 0.7,
+            8: 0.7,
+            9: 0.8,
+            10: 0.9,
+            11: 1.0,
+            12: 1.15
         }
         self.surcharge_rate = round(float(surcharge_rate), 3)
         self.max_daily_cycles = max_daily_cycles
@@ -79,7 +87,9 @@ class Battery:
         """Get seasonal adjustment factor for given month"""
         return self.monthly_distribution.get(month, 1.0)
 
-    def get_daily_consumption_for_date(self, date: Optional[datetime] = None) -> float:
+    def get_daily_consumption_for_date(self,
+                                       date: Optional[datetime] = None
+                                       ) -> float:
         """Calculate daily consumption for specific date considering seasonal patterns"""
         if date is None:
             date = datetime.now()
@@ -87,7 +97,9 @@ class Battery:
         seasonal_factor = self.get_seasonal_factor(date.month)
         return yearly_daily_avg * seasonal_factor
 
-    def get_hourly_consumption(self, hour: int, date: Optional[datetime] = None) -> float:
+    def get_hourly_consumption(self,
+                               hour: int,
+                               date: Optional[datetime] = None) -> float:
         """Calculate hourly consumption based on usage pattern"""
         if date is None:
             date = datetime.now()
@@ -99,6 +111,41 @@ class Battery:
         daily = self.get_daily_consumption_for_date(date) / 24.0
         is_weekend = date.weekday() >= 5
 
+        if self.usage_pattern == "Night-heavy":
+            if not is_weekend:
+                if 7 <= hour <= 9:
+                    return daily * 1.0
+                elif 17 <= hour <= 22:
+                    return daily * 2.5
+                elif 0 <= hour <= 6:
+                    return daily * 0.8
+                else:
+                    return daily * 1
+            else:
+                if 9 <= hour <= 12:
+                    return daily * 1
+                elif 13 <= hour <= 24:
+                    return daily * 1.8
+                else:
+                    return daily * 0.8
+        elif self.usage_pattern == "Day-heavy":
+            if not is_weekend:
+                if 7 <= hour <= 9:
+                    return daily * 1.2
+                elif 17 <= hour <= 22:
+                    return daily * 2.0
+                elif 0 <= hour <= 6:
+                    return daily * 0.3
+                else:
+                    return daily * 1.4
+            else:
+                if 9 <= hour <= 12:
+                    return daily * 1.8
+                elif 13 <= hour <= 22:
+                    return daily * 1.5
+                else:
+                    return daily * 0.4
+        # Default is Flat
         if not is_weekend:
             if 7 <= hour <= 9:
                 return daily * 2.0
@@ -109,10 +156,10 @@ class Battery:
             else:
                 return daily * 0.8
         else:
-            if 9 <= hour <= 12:
-                return daily * 1.8
-            elif 13 <= hour <= 22:
+            if 8 <= hour <= 18:
                 return daily * 1.5
+            elif 18 <= hour <= 22:
+                return daily * 1.8
             else:
                 return daily * 0.4
 
@@ -120,7 +167,7 @@ class Battery:
         """Get current power flow (positive for charging, negative for discharging)"""
         hour = datetime.now().hour
         consumption = self.get_hourly_consumption(hour)
-        
+
         if self.current_soc <= self.min_soc:
             return 0.0
         elif self.current_soc < 0.3:  # Low SOC condition
@@ -129,7 +176,8 @@ class Battery:
             return -min(self.charge_rate, consumption)
         else:
             if 0 <= hour < 6:  # Night charging
-                return min(self.charge_rate * 0.8, self.get_available_capacity())
+                return min(self.charge_rate * 0.8,
+                           self.get_available_capacity())
             elif 10 <= hour < 16:  # Day discharge
                 return -min(self.charge_rate * 0.6, consumption)
             else:  # Evening/morning
@@ -139,14 +187,16 @@ class Battery:
         """Calculate effective price including surcharge"""
         return round(base_price + self.surcharge_rate, 3)
 
-    def get_consumption_confidence_intervals(self, date: Optional[datetime] = None) -> Dict[str, float]:
+    def get_consumption_confidence_intervals(self,
+                                             date: Optional[datetime] = None
+                                             ) -> Dict[str, float]:
         """Calculate confidence intervals for consumption prediction"""
         if date is None:
             date = datetime.now()
 
         base_consumption = self.get_daily_consumption_for_date(date)
         std_dev = base_consumption * 0.15
-        
+
         return {
             'mean': base_consumption,
             'lower_95': base_consumption - (1.96 * std_dev),

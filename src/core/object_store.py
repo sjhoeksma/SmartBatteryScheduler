@@ -3,7 +3,7 @@ import os
 from datetime import datetime, time, timezone
 from typing import List, Dict, Any
 import streamlit as st
-from dynamicbalancing.profiles import BatteryProfile
+from core.profiles import BatteryProfile
 
 
 class ObjectStore:

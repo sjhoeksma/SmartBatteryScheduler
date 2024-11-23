@@ -23,7 +23,6 @@ The class provides the following methods:
 
 import asyncio
 import aiohttp
-import async_timeout
 import time
 from yarl import URL
 from pytz import country_timezones
