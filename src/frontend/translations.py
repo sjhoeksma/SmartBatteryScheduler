@@ -364,28 +364,32 @@ def get_browser_language() -> str:
 
 
 def set_language(lang: str) -> None:
-            """Set the application language."""
-            if lang in ['en', 'nl']:
-                        st.session_state.language = lang
+    """Set the application language."""
+    if lang in ['en', 'nl']:
+        st.session_state.language = lang
+        st.session_state["language_selector"] = lang
 
 
 def get_text(key: str) -> str:
-            """Get translated text for the current language."""
-            lang = get_browser_language()
-            translation = TRANSLATIONS.get(key)
-            if translation is None:
-                        return f"Missing translation: {key}"
-            return getattr(translation, lang)
+    """Get translated text for the current language."""
+    lang = get_browser_language()
+    translation = TRANSLATIONS.get(key)
+    if translation is None:
+        return f"Missing translation: {key}"
+    return getattr(translation, lang)
 
 
 def add_language_selector():
-            """Add a language selector widget to the sidebar."""
-            # Use timestamp for unique key
-            selector_key = f"language_selector_{int(time.time() * 1000)}"
-            st.sidebar.selectbox("🌐 Language / Taal",
-                                 options=['en', 'nl'],
-                                 format_func=lambda x: "English"
-                                 if x == "en" else "Nederlands",
-                                 key=selector_key,
-                                 on_change=lambda: set_language(
-                                     st.session_state[selector_key]))
+    """Add a language selector widget to the sidebar."""
+    selector_key = "language_selector"
+    current_lang = st.session_state.language
+    index = 0 if current_lang == 'en' else 1
+    
+    st.sidebar.selectbox(
+        "🌐 Language / Taal",
+        options=['en', 'nl'],
+        format_func=lambda x: "English" if x == "en" else "Nederlands",
+        key=selector_key,
+        index=index,
+        on_change=lambda: set_language(st.session_state[selector_key])
+    )

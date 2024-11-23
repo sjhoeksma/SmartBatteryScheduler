@@ -32,9 +32,6 @@ def get_max_forecast_hours():
         return remaining_hours  # Only return remaining hours of current day
 
 
-
-
-
 # Cache price data with TTL based on forecast hours
 @st.cache_data(ttl=900)  # 15 minutes cache
 def get_cached_prices(forecast_hours):
@@ -150,10 +147,6 @@ def main():
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            # Render energy consumption summary first
-            render_energy_consumption_summary(consumption, consumption_cost, 
-                                           optimize_consumption, optimize_cost)
-
             # Then render price chart
             if prices is not None and st.session_state.battery:
                 render_price_chart(prices, schedule, predicted_soc,
@@ -162,6 +155,11 @@ def main():
                 st.warning("No price data available")
 
         with col2:
+            # Render energy consumption summary first
+            render_energy_consumption_summary(consumption, consumption_cost,
+                                              optimize_consumption,
+                                              optimize_cost)
+
             st.subheader(get_text("battery_config"))
             render_battery_config()
 
