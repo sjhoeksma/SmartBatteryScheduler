@@ -12,7 +12,7 @@ from frontend.components.historical_analysis import render_historical_analysis
 
 from core import Battery, Optimizer, PriceService, WeatherService
 from core.price_data import get_day_ahead_prices, get_price_forecast_confidence
-from frontend.translations import get_text, add_language_selector
+from frontend.translations import get_text
 from core.object_store import ObjectStore
 
 # Page config moved to app.py
@@ -63,9 +63,6 @@ def main():
         </style>
     ''',
                 unsafe_allow_html=True)
-
-    # Add language selector to sidebar
-    add_language_selector()
 
     # Initialize session state
     if 'store' not in st.session_state:

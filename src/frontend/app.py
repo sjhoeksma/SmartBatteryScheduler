@@ -1,6 +1,8 @@
 import streamlit as st
 from frontend.main import main
 from frontend.translations import add_language_selector, get_text
+from frontend.components.battery_config import render_battery_config
+from core.object_store import ObjectStore
 
 # Must be the first Streamlit command
 st.set_page_config(page_title="Energy Management Dashboard",

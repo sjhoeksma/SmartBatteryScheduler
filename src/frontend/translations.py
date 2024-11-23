@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 import streamlit as st
 from dataclasses import dataclass
+import time
 
 
 @dataclass
@@ -363,8 +364,8 @@ def get_text(key: str) -> str:
 
 def add_language_selector():
             """Add a language selector widget to the sidebar."""
-            # Use sidebar id for unique key
-            selector_key = f"language_selector_{id(st.sidebar)}"
+            # Use timestamp for unique key
+            selector_key = f"language_selector_{int(time.time() * 1000)}"
             st.sidebar.selectbox("🌐 Language / Taal",
                                  options=['en', 'nl'],
                                  format_func=lambda x: "English"
