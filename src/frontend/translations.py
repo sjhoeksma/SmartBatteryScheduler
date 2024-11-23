@@ -381,15 +381,16 @@ def get_text(key: str) -> str:
 
 def add_language_selector():
     """Add a language selector widget to the sidebar."""
-    selector_key = "language_selector"
     current_lang = st.session_state.get('language', 'en')
     
     selected = st.sidebar.selectbox(
         "🌐 Language / Taal",
         options=['en', 'nl'],
         format_func=lambda x: "English" if x == "en" else "Nederlands",
-        key=selector_key,
-        index=0 if current_lang == 'en' else 1,
-        on_change=set_language,
-        args=(st.session_state.get(selector_key),)
+        key="language_selector",
+        index=0 if current_lang == 'en' else 1
     )
+    
+    if selected != current_lang:
+        st.session_state.language = selected
+        st.rerun()
