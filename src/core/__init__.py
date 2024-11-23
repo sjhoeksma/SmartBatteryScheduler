@@ -12,6 +12,7 @@ This library provides components for:
 
 from .battery import Battery
 from .optimizer import Optimizer
+from .optimize_result import OptimizeResult
 from .profiles import BatteryProfile
 from .weather import WeatherService
 from .price import PriceService
@@ -26,8 +27,8 @@ from .exceptions import (
 
 __version__ = "0.1.0"
 __all__ = [
-    'Battery', 'Optimizer', 'BatteryProfile', 'WeatherService', 'PriceService',
-    'price_data', "Client", 'EcactusEcosConnectionException',
+    'Battery', 'Optimizer', 'OptimizeResult', 'BatteryProfile', 'WeatherService',
+    'PriceService', 'price_data', "Client", 'EcactusEcosConnectionException',
     "EcactusEcosException", "EcactusEcosUnauthenticatedException",
     "EcactusEcosDataException"
 ]

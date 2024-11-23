@@ -4,12 +4,11 @@ Battery charging schedule optimization and energy management
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from typing import Tuple, Dict, Optional, List, Any, Union
+from typing import Dict, Optional, List, Any, Union
 from datetime import datetime
-import numpy as np
-import pandas as pd
 
 from .battery import Battery
+from .optimize_result import OptimizeResult
 
 class Optimizer:
     """Battery charge/discharge schedule optimizer"""
@@ -22,7 +21,7 @@ class Optimizer:
         self,
         prices: pd.Series,
         pv_forecast: Optional[Dict[Union[datetime, pd.Timestamp], float]] = None
-    ) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame, float, float, float, float]:
+    ) -> OptimizeResult:
         """
         Optimize charging schedule based on prices, battery constraints, and PV production
         
@@ -31,14 +30,11 @@ class Optimizer:
             pv_forecast: Optional dictionary of PV production forecast by datetime
             
         Returns:
-            Tuple containing:
-            - schedule: Optimized charging schedule
-            - predicted_soc: Predicted state of charge
-            - consumption_stats: Consumption statistics
-            - consumption: Total consumption
-            - consumption_cost: Total cost without optimization
-            - optimize_consumption: Optimized consumption
-            - optimize_cost: Optimized cost
+            OptimizeResult containing optimization results including:
+            - Optimized charging schedule
+            - Predicted state of charge
+            - Consumption statistics
+            - Cost and consumption metrics
         """
         periods = len(prices)
         schedule = np.zeros(periods)
@@ -142,9 +138,14 @@ class Optimizer:
             optimize_consumption += schedule[i]
             optimize_cost += prices.iloc[i] * schedule[i]
 
-        return (
-            schedule, predicted_soc, consumption_stats,
-            consumption, consumption_cost, optimize_consumption, optimize_cost
+        return OptimizeResult(
+            schedule=schedule,
+            predicted_soc=predicted_soc,
+            consumption_stats=consumption_stats,
+            consumption=consumption,
+            consumption_cost=consumption_cost,
+            optimize_consumption=optimize_consumption,
+            optimize_cost=optimize_cost
         )
 
     def _analyze_consumption_patterns(self, dates: List[datetime]) -> pd.DataFrame:

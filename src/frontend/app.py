@@ -1,19 +1,7 @@
-import streamlit as st
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from frontend.main import main
 
-from backend.app import create_app
-from frontend.components.battery_config import render_battery_config
-from frontend.components.price_chart import render_price_chart
-from frontend.components.battery_status import render_battery_status
-from frontend.components.cost_calculator import render_cost_calculator
-from frontend.components.manual_battery_control import render_manual_battery_control
-from frontend.components.historical_analysis import render_historical_analysis
-
-from core import Battery, Optimizer, PriceService, WeatherService
-from core.price_data import get_day_ahead_prices, get_price_forecast_confidence
-from frontend.translations import get_text, add_language_selector
-from core.object_store import ObjectStore
+if __name__ == "__main__":
+    main()
 
 st.set_page_config(page_title="Energy Management Dashboard",
                    page_icon="⚡",

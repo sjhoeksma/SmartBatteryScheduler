@@ -131,13 +131,18 @@ def main():
         prices = get_cached_prices(st.session_state.forecast_hours)
         if prices is not None and st.session_state.battery:
             optimizer = Optimizer(st.session_state.battery)
-            schedule, predicted_soc, consumption_stats, consumption, consumption_cost, optimize_consumption, optimize_cost = optimizer.optimize_schedule(
-                prices)
+            optimization_result = optimizer.optimize_schedule(prices)
+            schedule = optimization_result.schedule
+            predicted_soc = optimization_result.predicted_soc
+            consumption_stats = optimization_result.consumption_stats
+            consumption = optimization_result.consumption
+            consumption_cost = optimization_result.consumption_cost
+            optimize_consumption = optimization_result.optimize_consumption
+            optimize_cost = optimization_result.optimize_cost
     except Exception as e:
         st.error(f"Error updating price data: {str(e)}")
 
         # Layout
-
     tab1, tab2, tab3, tab4 = st.tabs([
         get_text("real_time_dashboard"),
         get_text("manual_control"),
