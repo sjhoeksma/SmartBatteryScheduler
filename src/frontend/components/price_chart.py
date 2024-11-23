@@ -16,14 +16,6 @@ logging.basicConfig(level=logging.INFO)
 @st.cache_data(ttl=3600)
 def get_base_figure_layout():
     return {
-        'title': {
-            'text': get_text("price_chart_title"),
-            'y': 0.95,
-            'x': 0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': dict(size=20)
-        },
         'xaxis':
         dict(title=get_text("time"),
              gridcolor="rgba(128, 128, 128, 0.2)",
@@ -152,7 +144,7 @@ def render_price_chart(prices,
                 go.Bar(
                     x=chunk_dates,
                     y=chunk_prices.values,
-                    name="Energy Price" if i == 0 else None,
+                    name=get_text("energy_price") if i == 0 else None,
                     marker_color=chunk_colors,
                     marker_opacity=confidence_levels,
                     yaxis="y2",
