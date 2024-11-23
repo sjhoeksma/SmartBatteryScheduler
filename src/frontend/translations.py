@@ -334,6 +334,22 @@ TRANSLATIONS: Dict[str, Translation] = {
         nl="Stel het minimum en maximum aantal laad/ontlaadcycli per dag in"),
     "scheduled":
     Translation(en="Scheduled", nl="Gepland"),
+    "energy_consumption_summary":
+    Translation(en="Energy Consumption Summary", nl="Energieverbruik Overzicht"),
+    "total_predicted_consumption":
+    Translation(en="Total Predicted Consumption", nl="Totaal Voorspeld Verbruik"),
+    "total_estimated_cost":
+    Translation(en="Total Estimated Cost", nl="Totale Geschatte Kosten"),
+    "average_price":
+    Translation(en="Average Price", nl="Gemiddelde Prijs"),
+    "optimization_consumption":
+    Translation(en="Optimization Consumption", nl="Optimalisatie Verbruik"),
+    "optimization_cost":
+    Translation(en="Optimization Cost", nl="Optimalisatie Kosten"),
+    "average_optimization_price":
+    Translation(en="Average Optimization Price", nl="Gemiddelde Optimalisatie Prijs"),
+    "savings":
+    Translation(en="Savings", nl="Besparingen"),
     "completed":
     Translation(en="Completed", nl="Voltooid"),
 }

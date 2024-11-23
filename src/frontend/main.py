@@ -9,6 +9,7 @@ from frontend.components.battery_status import render_battery_status
 from frontend.components.cost_calculator import render_cost_calculator
 from frontend.components.manual_battery_control import render_manual_battery_control
 from frontend.components.historical_analysis import render_historical_analysis
+from frontend.components.energy_consumption import render_energy_consumption_summary
 
 from core import Battery, Optimizer, PriceService, WeatherService
 from core.price_data import get_day_ahead_prices, get_price_forecast_confidence
@@ -149,27 +150,16 @@ def main():
         col1, col2 = st.columns([2, 1])
 
         with col1:
+            # Render energy consumption summary first
+            render_energy_consumption_summary(consumption, consumption_cost, 
+                                           optimize_consumption, optimize_cost)
+
+            # Then render price chart
             if prices is not None and st.session_state.battery:
                 render_price_chart(prices, schedule, predicted_soc,
                                    consumption_stats)
             else:
                 st.warning("No price data available")
-
-            # Format consumption summary with proper null handling
-            if consumption and consumption_cost and optimize_consumption and optimize_cost:
-                avg_price = consumption_cost / consumption if consumption > 0 else 0
-                avg_opt_price = optimize_cost / optimize_consumption if optimize_consumption > 0 else 0
-                savings = consumption_cost - optimize_cost
-                st.markdown(f'''
-                    ### Energy Consumption Summary
-                    - 📊 Total Predicted Consumption: {consumption:.2f} kWh
-                    - 💰 Total Estimated Cost: €{consumption_cost:.2f}
-                    - 💵 Average Price: €{avg_price:.3f}/kWh
-                    - 📊 Optimization Consumption: {optimize_consumption:.2f} kWh
-                    - 💰 Optimization Cost: €{optimize_cost:.2f}
-                    - 💵 Average Optimization Price: €{avg_opt_price:.3f}/kWh
-                    - 💰 Saving: €{savings:.2f}
-                    ''')
 
         with col2:
             st.subheader(get_text("battery_config"))
