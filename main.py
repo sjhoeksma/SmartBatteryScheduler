@@ -12,8 +12,7 @@ from components.manual_battery_control import render_manual_battery_control
 from components.historical_analysis import render_historical_analysis
 from utils.price_data import get_day_ahead_prices, get_price_forecast_confidence
 
-from utils.optimizer import optimize_schedule
-from utils.battery import Battery
+from dynamicbalancing import Battery, Optimizer, PriceService
 from utils.translations import get_text, add_language_selector
 from utils.object_store import ObjectStore
 from utils.weather_service import WeatherService
@@ -37,11 +36,15 @@ def get_max_forecast_hours():
         return remaining_hours  # Only return remaining hours of current day
 
 
+# Initialize services
+if 'price_service' not in st.session_state:
+    st.session_state.price_service = PriceService()
+
 # Cache price data with TTL based on forecast hours
 @st.cache_data(ttl=900)  # 15 minutes cache
 def get_cached_prices(forecast_hours):
     """Get cached price data with extended forecast support"""
-    return get_day_ahead_prices(forecast_hours=forecast_hours)
+    return st.session_state.price_service.get_day_ahead_prices(forecast_hours=forecast_hours)
 
 
 def main():
@@ -127,8 +130,9 @@ def main():
         # Get prices and optimization results
         prices = get_cached_prices(st.session_state.forecast_hours)
         if prices is not None and st.session_state.battery:
-            schedule, predicted_soc, consumption_stats, consumption, consumption_cost, optimize_consumption, optimize_cost = optimize_schedule(
-                prices, st.session_state.battery)
+            optimizer = Optimizer(st.session_state.battery)
+            schedule, predicted_soc, consumption_stats, consumption, consumption_cost, optimize_consumption, optimize_cost = optimizer.optimize_schedule(
+                prices)
     except Exception as e:
         st.error(f"Error updating price data: {str(e)}")
 
@@ -155,16 +159,21 @@ def main():
             else:
                 st.warning("No price data available")
 
-            st.markdown(f'''
-                ### Energy Consumption Summary
-                - 📊 Total Predicted Consumption: {consumption:.2f} kWh
-                - 💰 Total Estimated Cost: €{consumption_cost:.2f}
-                - 💵 Average Price: €{consumption_cost/consumption:.3f}/kWh
-                - 📊 Optimization Consumption: {optimize_consumption:.2f} kWh
-                - 💰 Optimization Cost: €{optimize_cost:.2f}
-                - 💵 Average Optimization Price: €{optimize_cost/optimize_consumption:.3f}/kWh
-                - 💰 Saving: €{consumption_cost-optimize_cost:.2f}
-                ''')
+            # Format consumption summary with proper null handling
+            if consumption and consumption_cost and optimize_consumption and optimize_cost:
+                avg_price = consumption_cost/consumption if consumption > 0 else 0
+                avg_opt_price = optimize_cost/optimize_consumption if optimize_consumption > 0 else 0
+                savings = consumption_cost - optimize_cost
+                st.markdown(f'''
+                    ### Energy Consumption Summary
+                    - 📊 Total Predicted Consumption: {consumption:.2f} kWh
+                    - 💰 Total Estimated Cost: €{consumption_cost:.2f}
+                    - 💵 Average Price: €{avg_price:.3f}/kWh
+                    - 📊 Optimization Consumption: {optimize_consumption:.2f} kWh
+                    - 💰 Optimization Cost: €{optimize_cost:.2f}
+                    - 💵 Average Optimization Price: €{avg_opt_price:.3f}/kWh
+                    - 💰 Saving: €{savings:.2f}
+                    ''')
 
         with col2:
             st.subheader(get_text("battery_config"))
