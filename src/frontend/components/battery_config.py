@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
+import time
 from core import Battery
 from core.profiles import BatteryProfile
 from frontend.translations import get_text
@@ -104,7 +105,7 @@ def render_battery_config():
         st.error("Selected profile not found")
         return
 
-    with st.form(f"battery_config_{id(current_profile)}"):
+    with st.form(f"battery_config_{int(time.time() * 1000)}"):
         col1, col2 = st.columns(2)
 
         with col1:
@@ -241,7 +242,7 @@ def render_battery_config():
 
     # New profile creation
     st.markdown(f"### {get_text('create_new_profile')}")
-    with st.form(f"new_profile_{id(current_profile)}"):
+    with st.form(f"new_profile_{int(time.time() * 1000)}"):
         new_name = st.text_input(get_text("profile_name"))
         if st.form_submit_button("Create Profile"):
             if new_name and new_name not in profiles:
