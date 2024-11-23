@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
-from utils.weather_service import WeatherService
+from dynamicbalancing import WeatherService
 from utils.translations import get_text
 
 def render_historical_analysis(battery):
@@ -33,7 +33,7 @@ def render_historical_analysis(battery):
         )
 
     if start_date and end_date:
-        if start_date > end_date:
+        if isinstance(start_date, datetime) and isinstance(end_date, datetime) and start_date > end_date:
             st.error(get_text("date_range_error"))
             return
 
