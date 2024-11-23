@@ -4,7 +4,10 @@ Battery charging schedule optimization and energy management
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from typing import Tuple, Dict, Optional, List, Any
+from typing import Tuple, Dict, Optional, List, Any, Union
+from datetime import datetime
+import numpy as np
+import pandas as pd
 
 from .battery import Battery
 
@@ -18,7 +21,7 @@ class Optimizer:
     def optimize_schedule(
         self,
         prices: pd.Series,
-        pv_forecast: Optional[Dict[datetime, float]] = None
+        pv_forecast: Optional[Dict[Union[datetime, pd.Timestamp], float]] = None
     ) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame, float, float, float, float]:
         """
         Optimize charging schedule based on prices, battery constraints, and PV production
@@ -48,16 +51,36 @@ class Optimizer:
         optimize_cost = 0.0
 
         # Calculate effective prices with confidence weighting
+        def calculate_effective_price(price: float, date: Any) -> float:
+            try:
+                # Handle different date input types
+                if isinstance(date, (str, int, float)):
+                    date_ts = pd.to_datetime(date)
+                else:
+                    date_ts = pd.Timestamp(date)
+                
+                if isinstance(date_ts, pd.Timestamp):
+                    if pd.isna(date_ts):
+                        return float(price)
+                    confidence = self._get_price_forecast_confidence(date_ts.to_pydatetime())
+                    effective_price = self.battery.get_effective_price(float(price), date_ts.hour)
+                    return float(effective_price) * (0.9 + 0.1 * confidence)
+                return float(price)
+            except Exception as e:
+                print(f"Error calculating effective price: {str(e)}")
+                return float(price)
+            
         effective_prices = pd.Series([
-            float(self.battery.get_effective_price(float(price), int(pd.Timestamp(date).hour))) * 
-            (0.9 + 0.1 * self._get_price_forecast_confidence(date))
+            calculate_effective_price(price, date)
             for price, date in zip(prices.values, prices.index)
         ], index=prices.index)
 
         # Calculate daily thresholds
+        # Calculate daily thresholds with proper date handling
+        unique_dates = set(pd.to_datetime(prices.index).map(lambda x: x.date()))
         daily_thresholds = {
             date: self._calculate_price_thresholds(effective_prices, date)
-            for date in set(prices.index.date)
+            for date in unique_dates
         }
 
         current_soc = self.battery.current_soc
@@ -66,11 +89,26 @@ class Optimizer:
 
         # Process each period
         for i in range(periods):
-            current_datetime = prices.index[i]
-            current_date = current_datetime.date()
-            current_hour = current_datetime.hour
+            try:
+                current_datetime = prices.index[i]
+                if isinstance(current_datetime, (str, int, float)):
+                    current_datetime = pd.to_datetime(current_datetime)
+                
+                if not isinstance(current_datetime, pd.Timestamp):
+                    raise ValueError(f"Invalid datetime type: {type(current_datetime)}")
+                    
+                if pd.isna(current_datetime):
+                    continue
+                    
+                current_date = current_datetime.date()
+                current_hour = current_datetime.hour
+            except Exception as e:
+                print(f"Error processing datetime at index {i}: {str(e)}")
+                continue
             current_price = effective_prices.iloc[i]
-            current_pv = pv_forecast.get(current_datetime, 0.0) if pv_forecast else 0.0
+            # Convert to Python datetime for PV forecast lookup
+            current_pv_time = current_datetime.to_pydatetime()
+            current_pv = pv_forecast.get(current_pv_time, 0.0) if pv_forecast else 0.0
 
             if current_date not in daily_events:
                 daily_events[current_date] = {'cycles': 0.0}
@@ -85,7 +123,11 @@ class Optimizer:
             )
 
             # Update statistics and state
-            current_hour_consumption = self.battery.get_hourly_consumption(current_hour, current_datetime)
+            consumption_datetime = current_datetime.to_pydatetime() if isinstance(current_datetime, pd.Timestamp) else current_datetime
+            current_hour_consumption = self.battery.get_hourly_consumption(
+                current_hour,
+                consumption_datetime
+            )
             net_consumption = max(0, current_hour_consumption - current_pv)
             consumption += net_consumption
             consumption_cost += prices.iloc[i] * net_consumption
@@ -125,7 +167,8 @@ class Optimizer:
         date: datetime
     ) -> Dict[str, float]:
         """Calculate dynamic price thresholds using rolling window comparison"""
-        mask = pd.to_datetime(effective_prices.index).date == pd.Timestamp(date).date()
+        target_date = pd.Timestamp(date).date()
+        mask = pd.to_datetime(effective_prices.index).map(lambda x: x.date()) == target_date
         daily_prices = effective_prices[mask]
 
         window_size = min(self.battery.look_ahead_hours, len(daily_prices))
@@ -139,7 +182,7 @@ class Optimizer:
         return {
             'charge': charge_threshold.mean(),
             'discharge': discharge_threshold.mean(),
-            'rolling_mean': rolling_mean.mean()
+            'rolling_mean': float(rolling_mean.mean())
         }
 
     def _optimize_period(

@@ -3,8 +3,8 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.price_data import is_prices_available_for_tomorrow, get_price_forecast_confidence
-from utils.weather_service import WeatherService
+from dynamicbalancing.price_data import get_price_forecast_confidence, is_prices_available_for_tomorrow
+from dynamicbalancing import WeatherService
 import logging
 
 logger = logging.getLogger(__name__)

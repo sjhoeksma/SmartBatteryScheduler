@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
-from utils.battery_profiles import BatteryProfile
-from utils.battery import Battery
+from dynamicbalancing import Battery
+from dynamicbalancing.profiles import BatteryProfile
 from utils.translations import get_text
 from utils.object_store import ObjectStore
 

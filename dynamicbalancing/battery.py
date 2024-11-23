@@ -116,6 +116,25 @@ class Battery:
             else:
                 return daily * 0.4
 
+    def get_current_power(self) -> float:
+        """Get current power flow (positive for charging, negative for discharging)"""
+        hour = datetime.now().hour
+        consumption = self.get_hourly_consumption(hour)
+        
+        if self.current_soc <= self.min_soc:
+            return 0.0
+        elif self.current_soc < 0.3:  # Low SOC condition
+            return min(self.charge_rate, self.get_available_capacity())
+        elif self.current_soc > 0.8:  # High SOC condition
+            return -min(self.charge_rate, consumption)
+        else:
+            if 0 <= hour < 6:  # Night charging
+                return min(self.charge_rate * 0.8, self.get_available_capacity())
+            elif 10 <= hour < 16:  # Day discharge
+                return -min(self.charge_rate * 0.6, consumption)
+            else:  # Evening/morning
+                return -min(self.charge_rate * 0.3, consumption)
+
     def get_effective_price(self, base_price: float, hour: int) -> float:
         """Calculate effective price including surcharge"""
         return round(base_price + self.surcharge_rate, 3)
