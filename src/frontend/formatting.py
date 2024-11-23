@@ -1,5 +1,5 @@
 from datetime import datetime
-from utils.translations import get_browser_language
+from frontend.translations import get_browser_language
 
 
 def format_number(value: float, decimal_places: int = 2) -> str:

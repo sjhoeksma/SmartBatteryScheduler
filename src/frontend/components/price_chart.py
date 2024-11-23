@@ -3,8 +3,8 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from dynamicbalancing.price_data import get_price_forecast_confidence, is_prices_available_for_tomorrow
-from dynamicbalancing import WeatherService
+from core.price_data import get_price_forecast_confidence, is_prices_available_for_tomorrow
+from core.weather import WeatherService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -96,15 +96,14 @@ def get_price_colors(_dates, _prices):
             base_color = "rgba(255, 165, 0, {opacity})"  # Shoulder (orange)
 
         # Updated opacity settings for better visualization
+        confidence = np.clip(confidence, 0,
+                             1.0)  # Ensure confidence is in [0,1]
         if hour in [7, 8, 9, 17, 18, 19, 20]:
-            opacity = max(0.15,
-                          confidence * 0.4)  # Peak hours (more transparent)
+            opacity = np.clip(confidence * 0.4, 0.15, 1.0)  # Peak hours
         elif hour in [10, 11, 12, 13, 14, 15, 16]:
-            opacity = max(0.1, confidence *
-                          0.3)  # Shoulder hours (more transparent)
+            opacity = np.clip(confidence * 0.3, 0.1, 1.0)  # Shoulder hours
         else:
-            opacity = max(0.08, confidence *
-                          0.25)  # Off-peak hours (more transparent)
+            opacity = np.clip(confidence * 0.25, 0.08, 1.0)  # Off-peak hours
 
         colors.append(base_color.format(opacity=opacity))
 
@@ -142,9 +141,10 @@ def render_price_chart(prices,
             chunk_colors = colors[i:i + chunk_size]
             chunk_dates = prices.index[chunk_slice]
 
-            # Calculate confidence levels for each point
+            # Calculate confidence levels for each point and clip them to [0,1] range
             confidence_levels = [
-                get_price_forecast_confidence(date) for date in chunk_dates
+                np.clip(get_price_forecast_confidence(date), 0, 1.0)
+                for date in chunk_dates
             ]
 
             fig.add_trace(
@@ -171,7 +171,7 @@ def render_price_chart(prices,
                 production = weather_service.get_pv_forecast(
                     st.session_state.battery.max_watt_peak,
                     st.session_state.battery.pv_efficiency,
-                    date=date)
+                    date=date) / 1000  # Convert to kWh
                 pv_production.append(float(production))
 
             # Add debug logging
@@ -186,8 +186,6 @@ def render_price_chart(prices,
                         name="Solar Production",
                         line=dict(color="rgba(241, 196, 15, 1.0)", width=3),
                         mode='lines',
-                        fill='tozeroy',
-                        fillcolor='rgba(241, 196, 15, 0.2)',
                         hovertemplate=
                         "Time: %{x}<br>PV Production: %{y:.2f} kW<extra></extra>"
                     ))
@@ -208,38 +206,6 @@ def render_price_chart(prices,
                            mode='lines',
                            hovertemplate=
                            "Time: %{x}<br>Usage: %{y:.2f} kW<extra></extra>"))
-
-        # Add charging/discharging visualization with increased opacity
-        if schedule is not None and isinstance(
-                schedule, (list, np.ndarray)) and len(schedule) > 0:
-            # Convert schedule to numpy array if it's a list
-            schedule_array = np.array(schedule) if isinstance(
-                schedule, list) else schedule
-            charge_mask = np.greater(schedule_array, 0)
-            discharge_mask = np.less(schedule_array, 0)
-
-            if np.any(charge_mask):
-                fig.add_trace(
-                    go.Bar(
-                        x=prices.index[charge_mask],
-                        y=schedule_array[charge_mask],
-                        name="Charging",
-                        marker_color="rgba(0, 154, 0, 0.98)",
-                        width=3600000,
-                        hovertemplate=
-                        "Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"))
-
-            if np.any(discharge_mask):
-                fig.add_trace(
-                    go.Bar(
-                        x=prices.index[discharge_mask],
-                        y=schedule_array[discharge_mask],
-                        name="Discharging",
-                        marker_color="rgba(255, 0, 0, 0.98)",
-                        width=3600000,
-                        hovertemplate=
-                        "Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
-                    ))
 
         # Add SOC prediction with proper point visualization
         if predicted_soc is not None and isinstance(
@@ -279,6 +245,38 @@ def render_price_chart(prices,
                                yaxis="y3",
                                hovertemplate=
                                "Time: %{x}<br>SOC: %{y:.1f}%<extra></extra>"))
+
+        # Add charging/discharging visualization with increased opacity
+        if schedule is not None and isinstance(
+                schedule, (list, np.ndarray)) and len(schedule) > 0:
+            # Convert schedule to numpy array if it's a list
+            schedule_array = np.array(schedule) if isinstance(
+                schedule, list) else schedule
+            charge_mask = np.greater(schedule_array, 0)
+            discharge_mask = np.less(schedule_array, 0)
+
+            if np.any(charge_mask):
+                fig.add_trace(
+                    go.Bar(
+                        x=prices.index[charge_mask],
+                        y=schedule_array[charge_mask],
+                        name="Charging",
+                        marker_color="rgba(0, 154, 0, 0.98)",
+                        width=3600000,
+                        hovertemplate=
+                        "Time: %{x}<br>Charging: %{y:.2f} kW<extra></extra>"))
+
+            if np.any(discharge_mask):
+                fig.add_trace(
+                    go.Bar(
+                        x=prices.index[discharge_mask],
+                        y=schedule_array[discharge_mask],
+                        name="Discharging",
+                        marker_color="rgba(255, 0, 0, 0.98)",
+                        width=3600000,
+                        hovertemplate=
+                        "Time: %{x}<br>Discharging: %{y:.2f} kW<extra></extra>"
+                    ))
 
         # Add unique key to plotly chart to fix StreamlitDuplicateElementId error
         fig.update_layout(modebar={

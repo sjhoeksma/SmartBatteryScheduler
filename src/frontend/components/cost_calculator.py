@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-from utils.translations import get_text
+from frontend.translations import get_text
 
 
 def calculate_monthly_savings(prices, battery, usage_pattern='optimize'):

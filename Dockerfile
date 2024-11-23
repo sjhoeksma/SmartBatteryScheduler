@@ -8,9 +8,7 @@ RUN mkdir -p /app/.DB
 
 # Copy requirements
 COPY pyproject.toml .
-COPY main.py .
-COPY components/ components/
-COPY utils/ utils/
+COPY src/ .
 COPY .streamlit/ .streamlit/
 
 # Install dependencies using the pyproject.toml
@@ -23,4 +21,4 @@ EXPOSE 5000
 ENV PYTHONUNBUFFERED=1
 
 # Run streamlit
-CMD ["streamlit", "run", "main.py", "--server.port", "5000"]
+CMD ["streamlit", "run", "fontend/main.py", "--server.port", "5000"]

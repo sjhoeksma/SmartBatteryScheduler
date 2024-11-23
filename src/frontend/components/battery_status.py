@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
-from utils.translations import get_text
-from utils.formatting import format_percentage, format_number, format_date
+from frontend.translations import get_text
+from frontend.formatting import format_percentage, format_number, format_date
 
 
 def render_battery_status(battery):

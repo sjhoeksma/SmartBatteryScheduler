@@ -1,22 +1,52 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "repl-nix-workspace"
-version = "0.1.0"
-description = "Add your description here"
+name = "ecactus-ecos-client""
+version = "0.2.0"
+description = "A library for eCactus Ecos battery energy optimization and scheduling"
+readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Sierk Hoeksma", email = "sjhoeksma@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "ephem>=4.1.6",
     "numpy>=1.21.0",
     "pandas>=1.5.0",
-    "pillow>=11.0.0",
-    "plotly>=5.13.0",
-    "psycopg2-binary>=2.9.10",
-    "pvlib>=0.11.1",
-    "python-dateutil>=2.8.2",
-    "python-dotenv>=1.0.1",
-    "pytz>=2023.3",
-    "requests<=2.32.3",
-    "scipy",
-    "streamlit-echarts>=0.4.0",
-    "streamlit>=1.24.0",
-    "timezonefinder>=6.5.4",
+    "plotly>=5.0.0",
+    "requests>=2.25.0",
+    "python-dateutil>=2.8.0",
+    "streamlit>=1.8.0",
+    "pytz>=2024.1",
 ]
+
+[project.optional-dependencies]
+frontend = [
+    "streamlit>=1.8.0",
+    "plotly>=5.0.0",
+]
+backend = [
+    "streamlit>=1.8.0",
+]
+dev = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.0.0",
+    "black>=21.0.0",
+    "isort>=5.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["dynamicbalancing", "frontend", "backend"]
+
+[tool.setuptools.package-data]
+frontend = ["*.py"]
+backend = ["*.py"]
+dynamicbalancing = ["*.py"]

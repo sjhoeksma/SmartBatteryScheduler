@@ -70,3 +70,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 * Add support for Car loading algorithm
 * Add the PV_efficiency to battery config and profile
 * Add start current state to battery config
+* Use the power remaining for as part of logic voor PEAK en VALLEY

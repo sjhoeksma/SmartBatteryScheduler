@@ -16,6 +16,12 @@ from .profiles import BatteryProfile
 from .weather import WeatherService
 from .price import PriceService
 from . import price_data
+from .ecactusecos import (
+    EcactusEcos,
+    EcactusEcosException,
+    EcactusEcosConnectionException,
+    EcactusEcosUnauthenticatedException,
+)
 
 __version__ = "0.1.0"
 __all__ = [

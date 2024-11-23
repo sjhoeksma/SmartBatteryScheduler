@@ -2,17 +2,18 @@ import streamlit as st
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-from components.battery_config import render_battery_config
-from components.price_chart import render_price_chart
-from components.battery_status import render_battery_status
-from components.cost_calculator import render_cost_calculator
-from components.manual_battery_control import render_manual_battery_control
-from components.historical_analysis import render_historical_analysis
+from backend.app import create_app
+from frontend.components.battery_config import render_battery_config
+from frontend.components.price_chart import render_price_chart
+from frontend.components.battery_status import render_battery_status
+from frontend.components.cost_calculator import render_cost_calculator
+from frontend.components.manual_battery_control import render_manual_battery_control
+from frontend.components.historical_analysis import render_historical_analysis
 
-from dynamicbalancing import Battery, Optimizer, PriceService, WeatherService
-from dynamicbalancing.price_data import get_day_ahead_prices, get_price_forecast_confidence
-from utils.translations import get_text, add_language_selector
-from utils.object_store import ObjectStore
+from core import Battery, Optimizer, PriceService, WeatherService
+from core.price_data import get_day_ahead_prices, get_price_forecast_confidence
+from frontend.translations import get_text, add_language_selector
+from core.object_store import ObjectStore
 
 st.set_page_config(page_title="Energy Management Dashboard",
                    page_icon="⚡",
@@ -37,11 +38,13 @@ def get_max_forecast_hours():
 if 'price_service' not in st.session_state:
     st.session_state.price_service = PriceService()
 
+
 # Cache price data with TTL based on forecast hours
 @st.cache_data(ttl=900)  # 15 minutes cache
 def get_cached_prices(forecast_hours):
     """Get cached price data with extended forecast support"""
-    return st.session_state.price_service.get_day_ahead_prices(forecast_hours=forecast_hours)
+    return st.session_state.price_service.get_day_ahead_prices(
+        forecast_hours=forecast_hours)
 
 
 def main():
@@ -133,8 +136,7 @@ def main():
     except Exception as e:
         st.error(f"Error updating price data: {str(e)}")
 
-        # Layout
-
+    # Layout
     tab1, tab2, tab3, tab4 = st.tabs([
         get_text("real_time_dashboard"),
         get_text("manual_control"),
@@ -157,8 +159,8 @@ def main():
 
             # Format consumption summary with proper null handling
             if consumption and consumption_cost and optimize_consumption and optimize_cost:
-                avg_price = consumption_cost/consumption if consumption > 0 else 0
-                avg_opt_price = optimize_cost/optimize_consumption if optimize_consumption > 0 else 0
+                avg_price = consumption_cost / consumption if consumption > 0 else 0
+                avg_opt_price = optimize_cost / optimize_consumption if optimize_consumption > 0 else 0
                 savings = consumption_cost - optimize_cost
                 st.markdown(f'''
                     ### Energy Consumption Summary

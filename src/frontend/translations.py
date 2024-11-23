@@ -202,7 +202,8 @@ TRANSLATIONS: Dict[str, Translation] = {
     "hour_of_day":
     Translation(en="Hour of Day", nl="Uur van de Dag"),
     "production_statistics":
-    Translation(en="Production Statistics", nl="Productiestatistieken"),
+    Translation(en="Selection Production Statistics",
+                nl="Selectie Productiestatistieken"),
     "total_production":
     Translation(en="Total Production", nl="Totale Productie"),
     "average_daily":

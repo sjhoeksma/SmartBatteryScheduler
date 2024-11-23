@@ -1,9 +1,10 @@
 import streamlit as st
 import plotly.graph_objects as go
-from dynamicbalancing import Battery
-from dynamicbalancing.profiles import BatteryProfile
-from utils.translations import get_text
-from utils.object_store import ObjectStore
+from core import Battery
+from core.profiles import BatteryProfile
+from frontend.translations import get_text
+from frontend.translations import get_browser_language
+from core.object_store import ObjectStore
 
 
 def render_monthly_distribution(monthly_distribution):
