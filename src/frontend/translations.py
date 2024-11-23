@@ -335,9 +335,11 @@ TRANSLATIONS: Dict[str, Translation] = {
     "scheduled":
     Translation(en="Scheduled", nl="Gepland"),
     "energy_consumption_summary":
-    Translation(en="Energy Consumption Summary", nl="Energieverbruik Overzicht"),
+    Translation(en="Energy Consumption Summary",
+                nl="Energieverbruik Overzicht"),
     "total_predicted_consumption":
-    Translation(en="Total Predicted Consumption", nl="Totaal Voorspeld Verbruik"),
+    Translation(en="Total Predicted Consumption",
+                nl="Totaal Voorspeld Verbruik"),
     "total_estimated_cost":
     Translation(en="Total Estimated Cost", nl="Totale Geschatte Kosten"),
     "average_price":
@@ -347,7 +349,8 @@ TRANSLATIONS: Dict[str, Translation] = {
     "optimization_cost":
     Translation(en="Optimization Cost", nl="Optimalisatie Kosten"),
     "average_optimization_price":
-    Translation(en="Average Optimization Price", nl="Gemiddelde Optimalisatie Prijs"),
+    Translation(en="Average Optimization Price",
+                nl="Gemiddelde Optimalisatie Prijs"),
     "savings":
     Translation(en="Savings", nl="Besparingen"),
     "completed":
@@ -363,12 +366,31 @@ TRANSLATIONS: Dict[str, Translation] = {
     "usage_pattern_conservative":
     Translation(en="Conservative", nl="Conservatief"),
     "usage_pattern_information":
-    Translation(en="Usage Pattern Information", nl="Gebruikspatroon Informatie"),
+    Translation(en="Usage Pattern Information",
+                nl="Gebruikspatroon Informatie"),
     "usage_pattern_help":
-    Translation(
-        en="Optimize: 1.5 cycles/day, Conservative: 1 cycle/day",
-        nl="Optimaliseren: 1,5 cycli/dag, Conservatief: 1 cyclus/dag"
-    ),
+    Translation(en="Optimize: 1.5 cycles/day, Conservative: 1 cycle/day",
+                nl="Optimaliseren: 1,5 cycli/dag, Conservatief: 1 cyclus/dag"),
+    "usage_pattern_info_title":
+    Translation(en="Usage Pattern Information", nl="Gebruikspatroon Informatie"),
+    "usage_pattern_info_usage":
+    Translation(en="The black line shows actual home usage including hourly variations",
+                nl="De zwarte lijn toont het werkelijke thuisverbruik inclusief uurlijkse variaties"),
+    "usage_pattern_info_solar":
+    Translation(en="The yellow line shows predicted solar production",
+                nl="De gele lijn toont voorspelde zonne-energieproductie"),
+    "usage_pattern_info_charging":
+    Translation(en="Light blue bars indicate charging periods (buying energy)",
+                nl="Lichtblauwe balken geven oplaadperiodes aan (energie kopen)"),
+    "usage_pattern_info_discharging":
+    Translation(en="Dark blue bars indicate discharging periods (using stored energy)",
+                nl="Donkerblauwe balken geven ontlaadperiodes aan (opgeslagen energie gebruiken)"),
+    "usage_pattern_info_prices":
+    Translation(en="Energy prices are shown as hourly blocks with opacity indicating forecast confidence",
+                nl="Energieprijzen worden getoond als uurblokken met transparantie die de voorspellingszekerheid aangeeft"),
+    "usage_pattern_info_soc":
+    Translation(en="Purple line shows predicted battery State of Charge (SOC) with smooth transitions",
+                nl="Paarse lijn toont voorspelde batterijlaadtoestand (SOC) met vloeiende overgangen"),
 }
 
 
@@ -381,33 +403,32 @@ def get_browser_language() -> str:
 
 
 def set_language(lang: str) -> None:
-    """Set the application language."""
-    if lang in ['en', 'nl']:
-        st.session_state.language = lang
-        st.session_state["language_selector"] = lang
+            """Set the application language."""
+            if lang in ['en', 'nl']:
+                        st.session_state.language = lang
+                        st.session_state["language_selector"] = lang
 
 
 def get_text(key: str) -> str:
-    """Get translated text for the current language."""
-    lang = get_browser_language()
-    translation = TRANSLATIONS.get(key)
-    if translation is None:
-        return f"Missing translation: {key}"
-    return getattr(translation, lang)
+            """Get translated text for the current language."""
+            lang = get_browser_language()
+            translation = TRANSLATIONS.get(key)
+            if translation is None:
+                        return f"Missing translation: {key}"
+            return getattr(translation, lang)
 
 
 def add_language_selector():
-    """Add a language selector widget to the sidebar."""
-    current_lang = st.session_state.get('language', 'en')
-    
-    selected = st.sidebar.selectbox(
-        "🌐 Language / Taal",
-        options=['en', 'nl'],
-        format_func=lambda x: "English" if x == "en" else "Nederlands",
-        key="language_selector",
-        index=0 if current_lang == 'en' else 1
-    )
-    
-    if selected != current_lang:
-        st.session_state.language = selected
-        st.rerun()
+            """Add a language selector widget to the sidebar."""
+            current_lang = st.session_state.get('language', 'en')
+
+            selected = st.sidebar.selectbox(
+                "🌐 Language / Taal",
+                options=['en', 'nl'],
+                format_func=lambda x: "English" if x == "en" else "Nederlands",
+                key="language_selector",
+                index=0 if current_lang == 'en' else 1)
+
+            if selected != current_lang:
+                        st.session_state.language = selected
+                        st.rerun()

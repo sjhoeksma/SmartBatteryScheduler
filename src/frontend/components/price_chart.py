@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from core.price_data import get_price_forecast_confidence, is_prices_available_for_tomorrow
 from core.weather import WeatherService
 import logging
+from frontend.translations import get_text
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -294,14 +295,14 @@ def render_price_chart(prices,
                         config={'displayModeBar': True},
                         key=f"price_chart_{datetime.now().timestamp()}")
 
-        st.info("""
-        📈 **Usage Pattern Information**
-        - The black line shows actual home usage including hourly variations
-        - The yellow line shows predicted solar production
-        - Light blue bars indicate charging periods (buying energy)
-        - Dark blue bars indicate discharging periods (using stored energy)
-        - Energy prices are shown as hourly blocks with opacity indicating forecast confidence
-        - Purple line shows predicted battery State of Charge (SOC) with smooth transitions
-        """)
+        st.info(f'''
+        📈 **{get_text("usage_pattern_info_title")}**
+        - {get_text("usage_pattern_info_usage")}
+        - {get_text("usage_pattern_info_solar")}
+        - {get_text("usage_pattern_info_charging")}
+        - {get_text("usage_pattern_info_discharging")}
+        - {get_text("usage_pattern_info_prices")}
+        - {get_text("usage_pattern_info_soc")}
+        ''')
     except Exception as e:
         st.error(f"Error rendering price chart: {str(e)}")

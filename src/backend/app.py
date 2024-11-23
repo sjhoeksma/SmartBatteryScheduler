@@ -16,7 +16,8 @@ def create_app():
         # Initialize price service before battery
         if 'price_service' not in st.session_state:
             try:
-                st.session_state.price_service = PriceService()
+                price_service = PriceService()
+                st.session_state.price_service = price_service
                 st.session_state.price_service_initialized = True
             except Exception as e:
                 st.error(f"Failed to initialize price service: {str(e)}")
