@@ -362,6 +362,13 @@ TRANSLATIONS: Dict[str, Translation] = {
     Translation(en="Optimize", nl="Optimaliseren"),
     "usage_pattern_conservative":
     Translation(en="Conservative", nl="Conservatief"),
+    "usage_pattern_information":
+    Translation(en="Usage Pattern Information", nl="Gebruikspatroon Informatie"),
+    "usage_pattern_help":
+    Translation(
+        en="Optimize: 1.5 cycles/day, Conservative: 1 cycle/day",
+        nl="Optimaliseren: 1,5 cycli/dag, Conservatief: 1 cyclus/dag"
+    ),
 }
 
 

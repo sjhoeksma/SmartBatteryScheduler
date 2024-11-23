@@ -52,7 +52,7 @@ def render_cost_calculator(prices, battery):
             get_text("usage_pattern"),
             ['optimize', 'conservative'],
             format_func=lambda x: get_text(f"usage_pattern_{x.lower()}"),
-            help="Optimize: 1.5 cycles/day, Conservative: 1 cycle/day")
+            help=get_text("usage_pattern_help"))
 
     # Calculate savings
     savings = calculate_monthly_savings(prices, battery, usage_pattern)
