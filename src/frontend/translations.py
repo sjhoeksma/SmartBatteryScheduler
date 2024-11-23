@@ -389,7 +389,7 @@ def add_language_selector():
         options=['en', 'nl'],
         format_func=lambda x: "English" if x == "en" else "Nederlands",
         key=selector_key,
-        index=0 if current_lang == 'en' else 1
+        index=0 if current_lang == 'en' else 1,
+        on_change=set_language,
+        args=(st.session_state.get(selector_key),)
     )
-    if selected != current_lang:
-        set_language(selected)
