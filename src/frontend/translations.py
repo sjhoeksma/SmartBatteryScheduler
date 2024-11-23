@@ -352,6 +352,12 @@ TRANSLATIONS: Dict[str, Translation] = {
     Translation(en="Savings", nl="Besparingen"),
     "completed":
     Translation(en="Completed", nl="Voltooid"),
+    "usage_pattern_flat":
+    Translation(en="Flat", nl="Vlak"),
+    "usage_pattern_day":
+    Translation(en="Day-heavy", nl="Dag-intensief"),
+    "usage_pattern_night":
+    Translation(en="Night-heavy", nl="Nacht-intensief"),
 }
 
 
