@@ -1,38 +1,12 @@
+import streamlit as st
 from frontend.main import main
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="Energy Management Dashboard",
+                      page_icon="⚡",
+                      layout="wide",
+                      initial_sidebar_state="collapsed")
     main()
-
-st.set_page_config(page_title="Energy Management Dashboard",
-                   page_icon="⚡",
-                   layout="wide",
-                   initial_sidebar_state="collapsed")
-
-
-def get_max_forecast_hours():
-    """Calculate maximum available forecast hours based on current time"""
-    now = datetime.now()
-    publication_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
-    if now >= publication_time:
-        # After 13:00 CET, we have tomorrow's prices
-        return 36  # Changed from 48 to 36 hours
-    else:
-        # Before 13:00 CET, calculate remaining hours
-        remaining_hours = 24 - now.hour
-        return remaining_hours  # Only return remaining hours of current day
-
-
-# Initialize services
-if 'price_service' not in st.session_state:
-    st.session_state.price_service = PriceService()
-
-
-# Cache price data with TTL based on forecast hours
-@st.cache_data(ttl=900)  # 15 minutes cache
-def get_cached_prices(forecast_hours):
-    """Get cached price data with extended forecast support"""
-    return st.session_state.price_service.get_day_ahead_prices(
-        forecast_hours=forecast_hours)
 
 
 def main():
