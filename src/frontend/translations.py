@@ -12,6 +12,31 @@ class Translation:
 
 # Dictionary of translations
 TRANSLATIONS: Dict[str, Translation] = {
+    # Price chart translations
+    "price_chart_title": Translation(
+        en="Energy Prices and Usage Patterns",
+        nl="Energieprijzen en Gebruikspatronen"
+    ),
+    "price_per_kwh": Translation(
+        en="Price (€/kWh)",
+        nl="Prijs (€/kWh)"
+    ),
+    "state_of_charge_percent": Translation(
+        en="State of Charge (%)",
+        nl="Laadtoestand (%)"
+    ),
+    "solar_production": Translation(
+        en="Solar Production",
+        nl="Zonne-energieproductie"
+    ),
+    "home_usage": Translation(
+        en="Home Usage",
+        nl="Thuisverbruik"
+    ),
+    "predicted_soc": Translation(
+        en="Predicted SOC",
+        nl="Voorspelde Laadtoestand"
+    ),
     # Main interface translations
     "app_title":
     Translation(en="⚡ Energy Management Simulator",

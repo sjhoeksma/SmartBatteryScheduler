@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 def get_base_figure_layout():
     return {
         'title': {
-            'text': "Energy Prices and Usage Patterns",
+            'text': get_text("price_chart_title"),
             'y': 0.95,
             'x': 0.5,
             'xanchor': 'center',
@@ -25,19 +25,19 @@ def get_base_figure_layout():
             'font': dict(size=20)
         },
         'xaxis':
-        dict(title="Time",
+        dict(title=get_text("time"),
              gridcolor="rgba(128, 128, 128, 0.2)",
              tickformat="%H:%M",
              tickangle=-45,
              domain=[0, 0.85]),
         'yaxis':
-        dict(title="Power (kW)",
+        dict(title=get_text("power_kw"),
              titlefont=dict(color="rgba(52, 73, 94, 1.0)"),
              tickfont=dict(color="rgba(52, 73, 94, 1.0)"),
              gridcolor="rgba(128, 128, 128, 0.2)",
              zerolinecolor="rgba(128, 128, 128, 0.2)"),
         'yaxis2':
-        dict(title="Price (€/kWh)",
+        dict(title=get_text("price_per_kwh"),
              titlefont=dict(color="rgba(41, 128, 185, 1.0)"),
              tickfont=dict(color="rgba(41, 128, 185, 1.0)"),
              anchor="x",
@@ -45,7 +45,7 @@ def get_base_figure_layout():
              side="right",
              position=0.85),
         'yaxis3':
-        dict(title="State of Charge (%)",
+        dict(title=get_text("state_of_charge_percent"),
              titlefont=dict(color="rgba(155, 89, 182, 1.0)"),
              tickfont=dict(color="rgba(155, 89, 182, 1.0)"),
              anchor="free",
@@ -184,7 +184,7 @@ def render_price_chart(prices,
                     go.Scatter(
                         x=dates,
                         y=pv_production,
-                        name="Solar Production",
+                        name=get_text("solar_production"),
                         line=dict(color="rgba(241, 196, 15, 1.0)",
                                   width=3,
                                   shape='spline',
@@ -205,7 +205,7 @@ def render_price_chart(prices,
             fig.add_trace(
                 go.Scatter(x=prices.index,
                            y=home_usage,
-                           name="Home Usage",
+                           name=get_text("home_usage"),
                            line=dict(color="rgba(52, 73, 94, 0.9)",
                                      width=3,
                                      shape='spline',
@@ -243,7 +243,7 @@ def render_price_chart(prices,
                 fig.add_trace(
                     go.Scatter(x=timestamps,
                                y=soc_values,
-                               name="Predicted SOC",
+                               name=get_text("predicted_soc"),
                                line=dict(color="rgba(155, 89, 182, 0.9)",
                                          width=3,
                                          shape='spline',
