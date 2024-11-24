@@ -3,7 +3,7 @@ Backend application factory
 """
 import streamlit as st
 from core import Battery, Optimizer, PriceService, WeatherService
-from core.object_store import ObjectStore
+from backend.object_store import ObjectStore
 
 
 def create_app():
@@ -36,7 +36,8 @@ def create_app():
 
         # Initialize battery after required services
         if 'battery' not in st.session_state:
-            default_profile = st.session_state.store.get_profile("Home Battery")
+            default_profile = st.session_state.store.get_profile(
+                "Home Battery")
             if default_profile:
                 st.session_state.battery = Battery(
                     capacity=default_profile.capacity,
@@ -52,8 +53,7 @@ def create_app():
                     max_daily_cycles=default_profile.max_daily_cycles,
                     surcharge_rate=default_profile.surcharge_rate,
                     max_watt_peak=default_profile.max_watt_peak,
-                    look_ahead_hours=36
-                )
+                    look_ahead_hours=36)
 
         # Initialize default language
         if 'language' not in st.session_state:

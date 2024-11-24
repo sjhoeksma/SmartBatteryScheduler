@@ -14,7 +14,7 @@ from frontend.components.energy_consumption import render_energy_consumption_sum
 from core import Battery, Optimizer, PriceService, WeatherService
 from core.price_data import get_day_ahead_prices, get_price_forecast_confidence
 from frontend.translations import get_text
-from core.object_store import ObjectStore
+from backend.object_store import ObjectStore
 
 # Page config moved to app.py
 
@@ -25,7 +25,7 @@ def get_max_forecast_hours():
     publication_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
     if now >= publication_time:
         # After 13:00 CET, we have tomorrow's prices
-        return 36  # Changed from 48 to 36 hours
+        return 36
     else:
         # Before 13:00 CET, calculate remaining hours
         remaining_hours = 24 - now.hour

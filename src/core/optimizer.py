@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Dict, Optional, List, Any, Union
 from datetime import datetime
 
+from pandas.core.series import missing
+
 from .battery import Battery
 from .optimize_result import OptimizeResult
 
@@ -137,9 +139,9 @@ class Optimizer:
             consumption += net_consumption
             consumption_cost += prices.iloc[i] * net_consumption
 
-            current_soc = self._update_soc(current_soc, schedule[i],
-                                           net_consumption, current_pv,
-                                           predicted_soc, i)
+            current_soc = self._update_soc(current_soc, net_consumption,
+                                           current_pv, predicted_soc, i,
+                                           schedule)
 
         # Calculate optimization results
         for i in range(periods):
@@ -223,12 +225,21 @@ class Optimizer:
         future_min = future_prices.min() if len(
             future_prices) > 0 else current_price
 
+        missing_charges = (
+            self.battery.capacity -
+            (current_soc * self.battery.capacity)) / self.battery.charge_rate
         # How lower the soc how wider the quantile
-        valley_quantile = 0.05 + (0.05 * (1 - current_soc))
+        valley_quantile = 0.05 + (0.03 * missing_charges)
         is_valley = current_price <= future_prices.quantile(
-            valley_quantile) if len(future_prices) > 0 else False
+            valley_quantile) if len(future_prices) > 0 else True
+        if not is_valley and current_soc <= self.battery.empty_soc * 1.05 and current_price <= thresholds[
+                'charge']:
+            is_valley = True
+        print(f"valley_quantile: {valley_quantile}", is_valley, current_price)
         # Add strict peak detection with higher threshold
-        peak_quantile = 0.97 - (0.05 * current_soc)
+        avaiable_charges = (current_soc *
+                            self.battery.capacity) / self.battery.charge_rate
+        peak_quantile = 0.98 - (0.02 * avaiable_charges)
         is_peak = current_price >= future_prices.quantile(
             peak_quantile) if len(future_prices) > 0 else False
 
@@ -240,12 +251,8 @@ class Optimizer:
 
         if remaining_cycles > 0:
             # Regular price-based optimization
-            relative_charge_threshold = thresholds['rolling_mean'] * 0.98
             if (is_valley and current_soc <= self.battery.max_soc * 0.95
-                    and (current_price <= relative_charge_threshold or
-                         (current_soc <= self.battery.min_soc
-                          and current_price <= future_prices.min() * 1.02))
-                    and future_min != future_max and available_capacity > 0):
+                    and available_capacity > 0):
 
                 if available_capacity > 0:
                     return min(self.battery.charge_rate, available_capacity,
@@ -257,6 +264,7 @@ class Optimizer:
 
             # Discharging decision with peak detection and relative threshold
             elif (is_peak and future_max != 0
+                  and current_price >= thresholds['discharge']
                   and current_price >= future_max * 0.98
                   and available_discharge > 0):
                 max_allowed_discharge = min(
@@ -277,20 +285,46 @@ class Optimizer:
 
         return 0.0
 
-    def _update_soc(self, current_soc: float, schedule_value: float,
-                    net_consumption: float, current_pv: float,
-                    predicted_soc: np.ndarray, period: int) -> float:
+    def _update_soc(self, current_soc: float, net_consumption: float,
+                    current_pv: float, predicted_soc: np.ndarray, period: int,
+                    schedule: np.ndarray) -> float:
         """Update state of charge and predicted values"""
         consumption_soc_impact = net_consumption / self.battery.capacity
-        charge_soc_impact = max(0, schedule_value) / self.battery.capacity
-        discharge_soc_impact = abs(min(0,
-                                       schedule_value)) / self.battery.capacity
+        charge_soc_impact = max(0, schedule[period]) / self.battery.capacity
+        discharge_soc_impact = abs(min(
+            0, schedule[period])) / self.battery.capacity
         pv_charge_soc_impact = min(
             current_pv,
             self.battery.get_available_capacity()) / self.battery.capacity
 
         net_soc_change = (charge_soc_impact + pv_charge_soc_impact -
                           discharge_soc_impact - consumption_soc_impact)
+
+        # Check if the current soc drops below the minimum SOC
+        if current_soc + net_soc_change <= self.battery.empty_soc and period > 0:
+            # Find last discharge event and adjust discharge event to keep SOC above minimum level
+            missing_consumption_soc = (self.battery.empty_soc -
+                                       (current_soc + net_soc_change))
+            missing_consumption_soc_impact = missing_consumption_soc * self.battery.capacity
+            for j in reversed(range(period)):
+                if schedule[j] < 0:
+                    if abs(schedule[j]) >= missing_consumption_soc_impact:
+                        schedule[j] += missing_consumption_soc_impact
+                        #Adjust the predicted soc array
+                        _missing_consumption_soc = missing_consumption_soc / (
+                            period - j) * 4
+                        for point_index in range((period - j) * 4):
+                            predicted_soc[
+                                j * 4 +
+                                point_index] += _missing_consumption_soc
+                        break
+                    missing_consumption_soc_impact += schedule[j]
+                    _missing_consumption_soc = abs(
+                        schedule[j]) / self.battery.capacity / (period - j) * 4
+                    for point_index in range((period - j) * 4):
+                        predicted_soc[j * 4 +
+                                      point_index] += _missing_consumption_soc
+                    schedule[j] = 0
 
         new_soc = current_soc + net_soc_change
         new_soc = np.clip(new_soc, self.battery.empty_soc,

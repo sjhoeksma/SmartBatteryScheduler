@@ -56,6 +56,7 @@ class Battery:
         self.look_ahead_hours = look_ahead_hours
         self.pv_efficiency = pv_efficiency
         self.current_soc = current_soc
+        self.min_profit = 3 * surcharge_rate
         self._current_power = 0.0
         self._daily_cycles = 0.0
         self._last_reset = datetime.now().date()

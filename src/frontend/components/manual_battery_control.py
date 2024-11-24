@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import pytz
 from frontend.translations import get_text
-from core.object_store import ObjectStore
+from backend.object_store import ObjectStore
 
 
 def render_schedule_timeline(schedules):
@@ -120,11 +120,12 @@ def render_manual_battery_control(battery,
         col1, col2 = st.columns(2)
 
         with col1:
-            charge_power = st.number_input(get_text("charge_power_kw"),
+            charge_power = st.number_input(label=get_text("charge_power_kw"),
                                            min_value=0.0,
-                                           max_value=battery.charge_rate,
-                                           value=battery.charge_rate / 2,
-                                           step=0.1)
+                                           max_value=float(
+                                               battery.charge_rate),
+                                           value=battery.charge_rate / 2.0,
+                                           step=1.0)
 
             if st.button(get_text("start_charging")):
                 if battery.charge(charge_power):
@@ -136,11 +137,12 @@ def render_manual_battery_control(battery,
                         st.error(get_text("charge_failed"))
 
         with col2:
-            discharge_power = st.number_input(get_text("discharge_power_kw"),
-                                              min_value=0.0,
-                                              max_value=battery.charge_rate,
-                                              value=battery.charge_rate / 2,
-                                              step=0.1)
+            discharge_power = st.number_input(
+                label=get_text("discharge_power_kw"),
+                min_value=0.0,
+                max_value=float(battery.charge_rate),
+                value=battery.charge_rate / 2.0,
+                step=1.0)
 
             if st.button(get_text("start_discharging")):
                 if battery.discharge(discharge_power):
@@ -162,14 +164,14 @@ def render_manual_battery_control(battery,
                     format_func=lambda x: get_text(f"operation_{x}"))
 
             with col2:
-                power = st.number_input(get_text("power_kw"),
+                power = st.number_input(label=get_text("power_kw"),
                                         min_value=0.1,
-                                        max_value=battery.charge_rate,
-                                        value=battery.charge_rate / 2,
-                                        step=0.1)
+                                        max_value=float(battery.charge_rate),
+                                        value=battery.charge_rate / 2.0,
+                                        step=1.0)
 
             with col3:
-                start_time = st.time_input(get_text("start_time"),
+                start_time = st.time_input(label=get_text("start_time"),
                                            value=datetime.now().time())
 
             duration = st.slider(get_text("duration_hours"),

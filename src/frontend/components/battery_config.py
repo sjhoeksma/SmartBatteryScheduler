@@ -5,7 +5,7 @@ from core import Battery
 from core.profiles import BatteryProfile
 from frontend.translations import get_text
 from frontend.translations import get_browser_language
-from core.object_store import ObjectStore
+from backend.object_store import ObjectStore
 
 
 def render_monthly_distribution(monthly_distribution):
@@ -81,20 +81,20 @@ def render_battery_config():
     # Profile selection with delete button
     col1, col2, col3 = st.columns([5, 1, 1])
     with col1:
-        current_profile = st.selectbox(
-        get_text("battery_profile"),
-        profiles,
-        index=profiles.index(st.session_state.current_profile),
-        key=f"battery_profile_{id(profiles)}"
-    )
+        current_profile = st.selectbox(get_text("battery_profile"),
+                                       profiles,
+                                       index=profiles.index(
+                                           st.session_state.current_profile),
+                                       key=f"battery_profile_{id(profiles)}")
         st.session_state.current_profile = current_profile
+
     with col2:
-        if st.button("🔄", key=f"reload_battery_profile_{id(profiles)}"):
+        if st.button("🔄", key="reload_data"):
             st.cache_data.clear()
             st.rerun()
 
     with col3:
-        if st.button("🗑️", key=f"delete_profile_{id(profiles)}"):
+        if st.button("🗑️", key="delete_profile"):
             if current_profile != "Home Battery":  # Prevent deletion of default profile
                 st.session_state.store.remove_profile(current_profile)
                 st.rerun()
@@ -199,6 +199,7 @@ def render_battery_config():
 
         if st.form_submit_button("Update Configuration"):
             # Create updated profile with max_watt_peak
+
             updated_profile = BatteryProfile(
                 name=current_profile,
                 capacity=capacity,
